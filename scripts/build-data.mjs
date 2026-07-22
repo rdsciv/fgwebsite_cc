@@ -13,6 +13,17 @@ const SEASONS = fs
 const POS = { 1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST', 9: 'DL', 10: 'LB', 11: 'DB', 12: 'DB', 13: 'DL', 14: 'LB' };
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+// Starting-lineup slot ids -> friendly label (mirrors scripts/build-boxscores.mjs's SLOT map).
+// BENCH (20) and IR (21) are excluded — this is starting slots only.
+const STARTING_SLOT_LABEL = { 0: 'QB', 2: 'RB', 4: 'WR', 6: 'TE', 16: 'D/ST', 17: 'K', 23: 'FLEX' };
+
+function quantile(sorted, q) {
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
 // ---- owner (person) registry, keyed by ESPN member id (stable across seasons) ----
 // Some managers used different ESPN accounts across years; we canonicalize by real
 // name so one person == one franchise history. Every merge is logged for transparency.
@@ -85,6 +96,13 @@ for (const year of SEASONS) {
   const divisions = new Map((sched.divisions || []).map((d) => [d.id, d.name]));
   const nTeams = raw.teams.length;
 
+  const slotCounts = raw.settings?.rosterSettings?.lineupSlotCounts || {};
+  const startingSlots = {};
+  for (const [slotId, label] of Object.entries(STARTING_SLOT_LABEL)) {
+    const n = slotCounts[slotId] || 0;
+    if (n > 0) startingSlots[label] = n;
+  }
+
   // team -> owner id resolution
   const teamOwner = new Map();
   const teamMeta = new Map();
@@ -117,6 +135,7 @@ for (const year of SEASONS) {
 
   const seasonMatchups = [];
   const regWeekScores = []; // regular-season single-NFL-week team scores (era-consistent)
+  const yearTeamWeeks = []; // this year's slice of teamWeeks, for the all-play "Power" tally below
   for (const g of raw.schedule || []) {
     const home = g.home, away = g.away;
     if (!home || !away || home.teamId == null || away.teamId == null) continue;
@@ -158,7 +177,9 @@ for (const year of SEASONS) {
       const s = S(tid);
       for (const [sp, pts] of Object.entries(pbsp)) {
         const v = round2(pts);
-        teamWeeks.push({ year, week: Number(sp), ownerId: oid, teamId: tid, score: v });
+        const tw = { year, week: Number(sp), ownerId: oid, teamId: tid, score: v };
+        teamWeeks.push(tw);
+        yearTeamWeeks.push(tw);
         s.weeks.push(v); // single-NFL-week scores (true high/low week)
         s.nWeeks += 1;
         if (isReg) regWeekScores.push(v);
@@ -179,6 +200,27 @@ for (const year of SEASONS) {
     allGames.push(mObj);
   }
 
+  // all-play "Power" record: for every week a team played, tally a win for every OTHER
+  // team it outscored that same week and a loss for every team that outscored it.
+  const weekGroups = new Map(); // week -> [{teamId, score}]
+  for (const tw of yearTeamWeeks) {
+    if (!weekGroups.has(tw.week)) weekGroups.set(tw.week, []);
+    weekGroups.get(tw.week).push(tw);
+  }
+  const power = new Map(); // teamId -> {w,l,t}
+  for (const rows of weekGroups.values()) {
+    for (const row of rows) {
+      const p = power.get(row.teamId) || { w: 0, l: 0, t: 0 };
+      for (const other of rows) {
+        if (other.teamId === row.teamId) continue;
+        if (row.score > other.score) p.w++;
+        else if (row.score < other.score) p.l++;
+        else p.t++;
+      }
+      power.set(row.teamId, p);
+    }
+  }
+
   // regular-season ranking (win% then PF)
   const regRankOrder = [...teamMeta.keys()].sort((a, b) => {
     const A = S(a), B = S(b);
@@ -193,6 +235,8 @@ for (const year of SEASONS) {
   // assemble season teams
   const teams = [...teamMeta.values()].map((tm) => {
     const s = S(tm.teamId);
+    const p = power.get(tm.teamId) || { w: 0, l: 0, t: 0 };
+    const pgp = p.w + p.l + p.t || 1;
     return {
       ...tm,
       wins: s.w, losses: s.l, ties: s.t,
@@ -205,6 +249,8 @@ for (const year of SEASONS) {
       playoffWins: s.poW, playoffLosses: s.poL,
       highWeek: s.weeks.length ? Math.max(...s.weeks) : 0,
       lowWeek: s.weeks.length ? Math.min(...s.weeks) : 0,
+      powerWins: p.w, powerLosses: p.l, powerTies: p.t,
+      powerPct: Math.round(((p.w + p.t * 0.5) / pgp) * 1e4) / 1e4,
     };
   });
   teams.sort((a, b) => (a.finalRank || 99) - (b.finalRank || 99));
@@ -236,7 +282,7 @@ for (const year of SEASONS) {
   const draftType = picks.some((p) => p.bid > 0) ? 'auction' : 'snake';
 
   seasonsOut.push({
-    year, nTeams, regWeeks, draftType,
+    year, nTeams, regWeeks, draftType, startingSlots,
     avgScore: regWeekScores.length ? round2(regWeekScores.reduce((a, b) => a + b, 0) / regWeekScores.length) : 0,
     divisions: [...divisions.values()],
     champion: podium(champion), runnerUp: podium(runnerUp), third: podium(third),
@@ -252,12 +298,14 @@ for (const year of SEASONS) {
     ensureOwner(t.ownerId).seasons.push({
       year, teamName: t.teamName, abbrev: t.abbrev, division: t.division,
       wins: t.wins, losses: t.losses, ties: t.ties, pf: t.pf, pa: t.pa, ppg: t.ppg, weeks: t.weeks,
-      regWins: t.regWins, regLosses: t.regLosses, regRank: t.regRank,
+      regWins: t.regWins, regLosses: t.regLosses, regTies: t.regTies, regRank: t.regRank,
+      regSeasonChamp: t.regRank === 1,
       finalRank: t.finalRank, playoffSeed: t.playoffSeed,
       madePlayoffs: t.madePlayoffs, playoffWins: t.playoffWins,
       champion: t.finalRank === 1, runnerUp: t.finalRank === 2,
       last: t.finalRank === nTeams,
       highWeek: t.highWeek, lowWeek: t.lowWeek,
+      powerWins: t.powerWins, powerLosses: t.powerLosses, powerTies: t.powerTies,
     });
   }
 }
@@ -270,26 +318,52 @@ function readifExists(p) {
   return fs.existsSync(p) ? readJSON(p) : null;
 }
 
+// ---- per-owner career weekly-score distribution (box-plot quartiles) ----
+const weeksByOwner = new Map(); // ownerId -> [score, ...]
+for (const tw of teamWeeks) {
+  if (tw.score <= 0) continue;
+  if (!weeksByOwner.has(tw.ownerId)) weeksByOwner.set(tw.ownerId, []);
+  weeksByOwner.get(tw.ownerId).push(tw.score);
+}
+function computeDistribution(scores) {
+  if (!scores.length) return { min: 0, q1: 0, median: 0, q3: 0, max: 0, n: 0 };
+  const sorted = [...scores].sort((a, b) => a - b);
+  return {
+    min: round2(sorted[0]),
+    q1: round2(quantile(sorted, 0.25)),
+    median: round2(quantile(sorted, 0.5)),
+    q3: round2(quantile(sorted, 0.75)),
+    max: round2(sorted[sorted.length - 1]),
+    n: sorted.length,
+  };
+}
+
 // ---- owner all-time aggregates ----
 const ownersOut = [];
 for (const o of owners.values()) {
   if (!o.seasons.length) continue;
   o.seasons.sort((a, b) => a.year - b.year);
-  const A = { wins: 0, losses: 0, ties: 0, pf: 0, pa: 0, weeks: 0, regWins: 0, regLosses: 0, playoffWins: 0 };
-  let championships = 0, runnerUps = 0, lasts = 0, playoffApps = 0;
+  const A = {
+    wins: 0, losses: 0, ties: 0, pf: 0, pa: 0, weeks: 0, regWins: 0, regLosses: 0, regTies: 0, playoffWins: 0,
+    powerWins: 0, powerLosses: 0, powerTies: 0,
+  };
+  let championships = 0, runnerUps = 0, lasts = 0, playoffApps = 0, regSeasonChamps = 0;
   const finishes = [];
   for (const s of o.seasons) {
     A.wins += s.wins; A.losses += s.losses; A.ties += s.ties;
     A.pf += s.pf; A.pa += s.pa; A.weeks += s.weeks;
-    A.regWins += s.regWins; A.regLosses += s.regLosses;
+    A.regWins += s.regWins; A.regLosses += s.regLosses; A.regTies += s.regTies;
     A.playoffWins += s.playoffWins;
+    A.powerWins += s.powerWins; A.powerLosses += s.powerLosses; A.powerTies += s.powerTies;
     if (s.champion) championships++;
     if (s.runnerUp) runnerUps++;
     if (s.last) lasts++;
+    if (s.regSeasonChamp) regSeasonChamps++;
     if (s.madePlayoffs) playoffApps++;
     if (s.finalRank) finishes.push(s.finalRank);
   }
   const gp = A.wins + A.losses + A.ties;
+  const pgp = A.powerWins + A.powerLosses + A.powerTies || 1;
   ownersOut.push({
     id: o.id,
     name: o.name,
@@ -306,13 +380,18 @@ for (const o of owners.values()) {
       ppg: A.weeks ? round2(A.pf / A.weeks) : 0,
       papg: A.weeks ? round2(A.pa / A.weeks) : 0,
       diff: round2(A.pf - A.pa),
-      regWins: A.regWins, regLosses: A.regLosses,
+      regWins: A.regWins, regLosses: A.regLosses, regTies: A.regTies,
       playoffWins: A.playoffWins,
-      championships, runnerUps, lasts, playoffApps,
+      championships, runnerUps, lasts, playoffApps, regSeasonChamps,
       avgFinish: finishes.length ? round2(finishes.reduce((a, b) => a + b, 0) / finishes.length) : null,
       bestFinish: finishes.length ? Math.min(...finishes) : null,
       worstFinish: finishes.length ? Math.max(...finishes) : null,
       titles: o.seasons.filter((s) => s.champion).map((s) => s.year),
+      power: {
+        wins: A.powerWins, losses: A.powerLosses, ties: A.powerTies,
+        pct: Math.round(((A.powerWins + A.powerTies * 0.5) / pgp) * 1e4) / 1e4,
+      },
+      scoreDistribution: computeDistribution(weeksByOwner.get(o.id) || []),
     },
   });
 }

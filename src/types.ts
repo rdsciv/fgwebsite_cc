@@ -11,6 +11,22 @@ export interface Meta {
   generatedAt: string;
 }
 
+export interface PowerRecord {
+  wins: number;
+  losses: number;
+  ties: number;
+  pct: number;
+}
+
+export interface ScoreDistribution {
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  n: number;
+}
+
 export interface AllTime {
   wins: number;
   losses: number;
@@ -24,15 +40,19 @@ export interface AllTime {
   diff: number;
   regWins: number;
   regLosses: number;
+  regTies: number;
   playoffWins: number;
   championships: number;
   runnerUps: number;
   lasts: number;
   playoffApps: number;
+  regSeasonChamps: number;
   avgFinish: number | null;
   bestFinish: number | null;
   worstFinish: number | null;
   titles: number[];
+  power: PowerRecord;
+  scoreDistribution: ScoreDistribution;
 }
 
 export interface OwnerSeason {
@@ -49,7 +69,9 @@ export interface OwnerSeason {
   weeks: number;
   regWins: number;
   regLosses: number;
+  regTies: number;
   regRank: number | null;
+  regSeasonChamp: boolean;
   finalRank: number | null;
   playoffSeed: number | null;
   madePlayoffs: boolean;
@@ -59,6 +81,9 @@ export interface OwnerSeason {
   last: boolean;
   highWeek: number;
   lowWeek: number;
+  powerWins: number;
+  powerLosses: number;
+  powerTies: number;
 }
 
 export interface Owner {
@@ -107,6 +132,10 @@ export interface SeasonTeam {
   playoffLosses: number;
   highWeek: number;
   lowWeek: number;
+  powerWins: number;
+  powerLosses: number;
+  powerTies: number;
+  powerPct: number;
 }
 
 export type MatchupWinner = 'HOME' | 'AWAY' | 'TIE' | 'UNDECIDED';
@@ -153,6 +182,7 @@ export interface Season {
   nTeams: number;
   regWeeks: number;
   draftType: 'auction' | 'snake';
+  startingSlots: Record<string, number>; // e.g. { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, 'D/ST': 1, K: 1 }
   avgScore: number;
   divisions: string[];
   champion: Podium | null;
@@ -266,6 +296,21 @@ export interface ChampRow {
   regChamp: { owner: string; teamName: string } | null;
 }
 
+// Raw per-category NFL stat numerics behind the formatted `l` string — category-stat features
+// (Skill Radar / Roto Standings) sum these across starters rather than parsing `l`.
+export interface BoxPlayerStats {
+  att: number; // pass attempts
+  cmp: number; // pass completions
+  py: number; // pass yards
+  ptd: number; // pass TD
+  car: number; // rush attempts (carries)
+  ry: number; // rush yards
+  rtd: number; // rush TD
+  rec: number; // receptions
+  recy: number; // receiving yards
+  retd: number; // receiving TD
+}
+
 // ---- weekly boxscores (public/data/boxscores/{year}.json), 2018+ ----
 export interface BoxPlayer {
   id: number; // ESPN player id — join key to draft picks & external NFL data
@@ -274,6 +319,7 @@ export interface BoxPlayer {
   tm: string; // NFL team abbrev
   pt: number; // fantasy points that week
   l: string; // NFL stat line (e.g. "212 pass yd · 2 pass TD")
+  st: BoxPlayerStats | null; // raw per-category numerics (all-zero for K/D-ST; null only if the player didn't play that week)
   s: string; // lineup slot label (QB/RB/WR/TE/FLEX/D/ST/K, or BE/IR for bench)
 }
 export interface BoxSide {
@@ -296,6 +342,25 @@ export interface BoxGame {
 export interface SeasonBox {
   year: number;
   weeks: Record<string, BoxGame[]>;
+}
+
+// ---- roster age (public/data/roster-age/{year}.json), 2018+ ----
+export interface RosterAgePlayer {
+  playerId: number;
+  name: string;
+  age: number;
+}
+export interface RosterAgeTeam {
+  teamId: number;
+  ownerId: string | null;
+  teamName: string;
+  avgAge: number;
+  oldest: RosterAgePlayer[];
+  youngest: RosterAgePlayer[];
+}
+export interface SeasonRosterAge {
+  year: number;
+  teams: RosterAgeTeam[];
 }
 
 export interface League {

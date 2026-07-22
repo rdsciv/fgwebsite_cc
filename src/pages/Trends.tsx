@@ -13,7 +13,9 @@ import {
 } from 'recharts';
 import { useLeague } from '../data';
 import { PageHead, SectionHead } from '../components/bits';
-import { fmt, ordinal, SERIES, clsx } from '../lib/util';
+import { OwnerChip } from '../components/OwnerChip';
+import { BoxPlotRow } from '../components/BoxPlotRow';
+import { fmt, fmt0, ordinal, SERIES, clsx } from '../lib/util';
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0];
 const MAX_TRAJ = 6;
@@ -200,6 +202,23 @@ export function Trends() {
 
   const atCap = selected.length >= MAX_TRAJ;
   const careerHeight = Math.max(340, careerData.length * 30 + 40);
+
+  // 5 — career weekly-score distribution (box plot): every single-NFL-week score a manager
+  // has ever posted, ranked by median. Distinct from #4's mean-based PPG bar chart above.
+  const distData = useMemo(
+    () =>
+      owners
+        .filter((o) => o.allTime.scoreDistribution.n > 0)
+        .map((o) => ({ id: o.id, name: o.name, dist: o.allTime.scoreDistribution }))
+        .sort((a, b) => b.dist.median - a.dist.median),
+    [owners],
+  );
+  const distDomain = useMemo<[number, number]>(() => {
+    if (!distData.length) return [0, 100];
+    const mins = distData.map((d) => d.dist.min);
+    const maxs = distData.map((d) => d.dist.max);
+    return [Math.floor(Math.min(...mins) - 2), Math.ceil(Math.max(...maxs) + 2)];
+  }, [distData]);
 
   return (
     <div className="page">
@@ -404,6 +423,30 @@ export function Trends() {
               <Bar dataKey="ppg" fill="var(--s3)" radius={[0, 5, 5, 0]} maxBarSize={22} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* career weekly-score distribution */}
+      <div className="section">
+        <SectionHead
+          title="Team scoring distribution"
+          note="Every single-NFL-week score a manager has ever posted, ranked by median. Hover a box for exact quartiles."
+        />
+        <div className="chart-card">
+          {distData.map(({ id, name, dist }, i) => (
+            <div className="record-row" key={id}>
+              <span className="record-rank">{i + 1}</span>
+              <div className="record-main" style={{ flex: '0 0 210px' }}>
+                <OwnerChip id={id} name={name} size={22} />
+                <div className="record-sub" style={{ marginTop: 4 }}>
+                  {fmt0(dist.median)} median · {fmt0(dist.min)}–{fmt0(dist.max)}
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <BoxPlotRow dist={dist} domain={distDomain} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

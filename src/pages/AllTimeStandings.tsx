@@ -118,11 +118,34 @@ export function AllTimeStandings() {
       },
     },
     {
+      key: 'regChamps',
+      header: 'Reg. Champs',
+      sortable: true,
+      value: (o) => o.allTime.regSeasonChamps,
+      render: (o) => {
+        const n = o.allTime.regSeasonChamps;
+        return n > 0 ? (
+          <span className="tnum" title={`${n} regular-season title${n > 1 ? 's' : ''}`} style={{ fontWeight: 600 }}>
+            {n}
+          </span>
+        ) : (
+          <span className="muted">0</span>
+        );
+      },
+    },
+    {
       key: 'playoffApps',
       header: 'Playoffs',
       sortable: true,
       value: (o) => o.allTime.playoffApps,
       render: (o) => <span className="tnum">{o.allTime.playoffApps}</span>,
+    },
+    {
+      key: 'playoffPct',
+      header: 'Playoff %',
+      sortable: true,
+      value: (o) => (o.nSeasons ? o.allTime.playoffApps / o.nSeasons : 0),
+      render: (o) => <span className="tnum">{pct(o.nSeasons ? o.allTime.playoffApps / o.nSeasons : 0)}</span>,
     },
     {
       key: 'best',
@@ -153,6 +176,42 @@ export function AllTimeStandings() {
           {o.allTime.avgFinish == null ? '—' : fmt(o.allTime.avgFinish, 1)}
         </span>
       ),
+    },
+    {
+      key: 'regSeason',
+      header: 'Reg. Season',
+      sortable: true,
+      value: (o) => {
+        const { regWins, regLosses, regTies } = o.allTime;
+        const gp = regWins + regLosses + regTies;
+        return gp ? (regWins + regTies * 0.5) / gp : 0;
+      },
+      render: (o) => {
+        const { regWins, regLosses, regTies } = o.allTime;
+        const gp = regWins + regLosses + regTies;
+        const p = gp ? (regWins + regTies * 0.5) / gp : 0;
+        return (
+          <span className="tnum">
+            {recordStr(regWins, regLosses, regTies)}{' '}
+            <span className="muted" style={{ fontSize: 11 }}>({pct(p)})</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'power',
+      header: 'Power',
+      sortable: true,
+      value: (o) => o.allTime.power.pct,
+      render: (o) => {
+        const { wins, losses, ties, pct: p } = o.allTime.power;
+        return (
+          <span className="tnum" title="All-play record: a win for every other team outscored that week, a loss for every team that outscored this one">
+            {recordStr(wins, losses, ties)}{' '}
+            <span className="muted" style={{ fontSize: 11 }}>({pct(p)})</span>
+          </span>
+        );
+      },
     },
   ];
 
@@ -230,12 +289,13 @@ export function AllTimeStandings() {
           rows={owners}
           rank
           initialSortKey="record"
-          minWidth={980}
+          minWidth={1340}
           rowKey={(o) => o.id}
         />
         <p className="muted" style={{ fontSize: 12.5, marginTop: 12, maxWidth: '75ch' }}>
           PF and PA include playoff and consolation games; win % counts ties as half. Best and Avg
-          Finish are based on each season's final standing.
+          Finish are based on each season's final standing. Power is an all-play record — every
+          week, a win for each other team outscored and a loss for each team that scored higher.
         </p>
       </div>
     </div>

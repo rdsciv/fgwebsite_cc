@@ -1,13 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  LabelList,
+  ScatterChart,
+  Scatter,
+  Tooltip,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+} from 'recharts';
 import { useLeague } from '../data';
 import { PageHead, SectionHead, StatTile, Card } from '../components/bits';
 import { OwnerChip } from '../components/OwnerChip';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { loadBoxscore, hasBoxscores, FIRST_BOX_YEAR } from '../lib/boxscores';
 import { loadTransactions, type AcqEvent } from '../lib/transactions';
+import { loadRosterAge } from '../lib/rosterAge';
 import { computeSeasonAnalysis, type PickROI, type TeamRosterAnalysis, type Trade, type TradePlayer } from '../lib/analysis';
-import { clsx, fmt, fmt0, posColor } from '../lib/util';
-import type { SeasonBox } from '../types';
+import { computeTeamPotential, type TeamPotential } from '../lib/idealLineup';
+import { computeRbBuild, type RbBuildPoint } from '../lib/rbBuild';
+import { clsx, fmt, fmt0, linreg, posColor } from '../lib/util';
+import type { Season, SeasonBox, SeasonRosterAge } from '../types';
+
+const axisTick = { fill: 'var(--ink-3)', fontSize: 12 };
 
 const C_DRAFT = 'var(--s1)'; // blue
 const C_TRADE = 'var(--s2)'; // orange
@@ -20,6 +37,7 @@ export function RosterLab() {
   const [year, setYear] = useState(league.meta.lastSeason);
   const [box, setBox] = useState<SeasonBox | null>(null);
   const [tx, setTx] = useState<AcqEvent[]>([]);
+  const [rosterAge, setRosterAge] = useState<SeasonRosterAge | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,13 +45,15 @@ export function RosterLab() {
     if (!hasBoxscores(year)) {
       setBox(null);
       setTx([]);
+      setRosterAge(null);
       return;
     }
     setLoading(true);
-    Promise.all([loadBoxscore(year), loadTransactions(year)]).then(([b, t]) => {
+    Promise.all([loadBoxscore(year), loadTransactions(year), loadRosterAge(year)]).then(([b, t, ra]) => {
       if (!alive) return;
       setBox(b);
       setTx(t?.events ?? []);
+      setRosterAge(ra);
       setLoading(false);
     });
     return () => {
@@ -43,6 +63,8 @@ export function RosterLab() {
 
   const season = league.seasons.find((s) => s.year === year);
   const analysis = useMemo(() => (box && season ? computeSeasonAnalysis(box, season, tx) : null), [box, season, tx]);
+  const potential = useMemo(() => (box && season ? computeTeamPotential(box, season) : null), [box, season]);
+  const rbBuild = useMemo(() => (box && season ? computeRbBuild(season, box) : null), [box, season]);
 
   return (
     <div className="page">
@@ -68,8 +90,16 @@ export function RosterLab() {
 
       {loading && <div className="empty">Joining {year} rosters…</div>}
 
-      {!loading && analysis && (
-        <RosterAnalysis analysis={analysis} year={year} ownerName={ownerName} />
+      {!loading && analysis && season && potential && rbBuild && (
+        <RosterAnalysis
+          analysis={analysis}
+          potential={potential}
+          rbBuild={rbBuild}
+          rosterAge={rosterAge}
+          season={season}
+          year={year}
+          ownerName={ownerName}
+        />
       )}
     </div>
   );
@@ -81,10 +111,18 @@ function pctOf(part: number, whole: number) {
 
 function RosterAnalysis({
   analysis,
+  potential,
+  rbBuild,
+  rosterAge,
+  season,
   year,
   ownerName,
 }: {
   analysis: ReturnType<typeof computeSeasonAnalysis>;
+  potential: TeamPotential[];
+  rbBuild: RbBuildPoint[];
+  rosterAge: SeasonRosterAge | null;
+  season: Season;
   year: number;
   ownerName: (id: string) => string;
 }) {
@@ -155,11 +193,17 @@ function RosterAnalysis({
         </Card>
       </div>
 
+      <MaximumPotentialSection potential={potential} ownerName={ownerName} />
+      <ManagementEfficiencySection potential={potential} season={season} ownerName={ownerName} />
+      <AgeVsSuccessSection rosterAge={rosterAge} season={season} />
+
       {/* draft value retained */}
       <div className="section">
         <SectionHead title="Draft spend & roster value" note="What each team spent, what its season-ending roster was worth at draft prices, and its points by source" />
         <SortableTable columns={rosterCols} rows={teams} rowKey={(t) => t.teamId} initialSortKey="ptsDraft" minWidth={820} />
       </div>
+
+      <BackfieldBuildSection rbBuild={rbBuild} year={year} />
 
       {/* draft ROI — draft-and-keep outcomes only */}
       <div className="section">
@@ -205,6 +249,308 @@ function RosterAnalysis({
         </p>
       </div>
     </>
+  );
+}
+
+function MaximumPotentialSection({ potential, ownerName }: { potential: TeamPotential[]; ownerName: (id: string) => string }) {
+  const sorted = [...potential].sort((a, b) => b.idealPts - a.idealPts);
+  const top = sorted[0];
+  const maxIdeal = Math.max(...sorted.map((t) => t.idealPts), 1);
+  if (!top) return null;
+  return (
+    <div className="section">
+      <SectionHead title="Maximum potential" note="Actual starting-lineup points vs. what an optimal lineup (starters + bench) could have scored, ranked by highest ideal-points total" />
+      <div className="grid cols-2" style={{ marginBottom: 16 }}>
+        <StatTile
+          label="Highest Ideal Points"
+          value={ownerName(top.ownerId)}
+          accent="gold"
+          sub={<><span className="em">{fmt0(top.idealPts)}</span> ideal pts · {fmt(top.pctOfIdeal, 1)}% captured</>}
+        />
+      </div>
+      <div className="legend" style={{ marginBottom: 10 }}>
+        <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--win)' }} /> Actual points scored</span>
+        <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--surface-3)', border: '1px solid var(--line-strong)' }} /> Points left on table</span>
+      </div>
+      <Card className="card-pad">
+        {sorted.map((t) => {
+          const actualPct = t.idealPts > 0 ? (t.actualPts / t.idealPts) * 100 : 0;
+          const leftPct = 100 - actualPct;
+          return (
+            <div className="rl-row" key={t.teamId}>
+              <OwnerChip id={t.ownerId} name={ownerName(t.ownerId)} team={t.teamName} size={22} />
+              <div className="stack-bar" title={`Actual ${fmt0(t.actualPts)} · Left on table ${fmt0(t.leftOnTable)}`}>
+                <div className="stack-seg" style={{ width: `${actualPct}%`, background: 'var(--win)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {actualPct > 14 && <span style={{ fontSize: 11, fontWeight: 700, color: '#04231a' }}>{fmt0(t.actualPts)}</span>}
+                </div>
+                <div className="stack-seg" style={{ width: `${leftPct}%`, background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {leftPct > 10 && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)' }}>{fmt0(t.leftOnTable)}</span>}
+                </div>
+              </div>
+              <div className="rl-total" style={{ opacity: 0.55 + 0.45 * (t.idealPts / maxIdeal) }}>{fmt0(t.idealPts)}</div>
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
+interface ManagementPoint extends TeamPotential {
+  status: 'champion' | 'playoff' | 'out';
+}
+
+function EfficiencyTip({ active, payload, ownerName }: { active?: boolean; payload?: Array<{ payload: ManagementPoint }>; ownerName: (id: string) => string }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="tooltip-card">
+      <div className="tt-title">{p.teamName}</div>
+      <div className="tooltip-row"><span className="muted">Manager</span><span>{ownerName(p.ownerId)}</span></div>
+      <div className="tooltip-row"><span className="muted">Efficiency</span><span className="tnum">{fmt(p.pctOfIdeal, 1)}%</span></div>
+      <div className="tooltip-row"><span className="muted">Points scored</span><span className="tnum">{fmt0(p.actualPts)}</span></div>
+    </div>
+  );
+}
+
+function ManagementEfficiencySection({ potential, season, ownerName }: { potential: TeamPotential[]; season: Season; ownerName: (id: string) => string }) {
+  const teamStatus = new Map(season.teams.map((t) => [t.teamId, t]));
+  const points: ManagementPoint[] = potential.map((t) => {
+    const st = teamStatus.get(t.teamId);
+    const status: ManagementPoint['status'] = st?.finalRank === 1 ? 'champion' : st?.madePlayoffs ? 'playoff' : 'out';
+    return { ...t, status };
+  });
+  const champion = points.filter((p) => p.status === 'champion');
+  const playoff = points.filter((p) => p.status === 'playoff');
+  const out = points.filter((p) => p.status === 'out');
+  const mostEfficient = [...points].sort((a, b) => b.pctOfIdeal - a.pctOfIdeal)[0];
+  const leastEfficient = [...points].sort((a, b) => a.pctOfIdeal - b.pctOfIdeal)[0];
+  if (!points.length) return null;
+
+  return (
+    <div className="section">
+      <SectionHead title="Management efficiency" note="Actual points scored as a % of an optimal lineup's points, vs. season points scored" />
+      <div className="grid cols-2" style={{ marginBottom: 16 }}>
+        <StatTile
+          label="Most Efficient"
+          value={ownerName(mostEfficient.ownerId)}
+          accent="green"
+          sub={<><span className="em">{fmt(mostEfficient.pctOfIdeal, 1)}%</span> of ideal points captured</>}
+        />
+        <StatTile
+          label="Least Efficient"
+          value={ownerName(leastEfficient.ownerId)}
+          sub={<><span className="em">{fmt(leastEfficient.pctOfIdeal, 1)}%</span> of ideal points captured</>}
+        />
+      </div>
+      <div className="chart-card">
+        <ResponsiveContainer width="100%" height={360}>
+          <ScatterChart margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
+            <CartesianGrid stroke="var(--line)" />
+            <XAxis
+              type="number"
+              dataKey="pctOfIdeal"
+              name="Efficiency"
+              unit="%"
+              domain={['dataMin - 1', 'dataMax + 1']}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+            />
+            <YAxis
+              type="number"
+              dataKey="actualPts"
+              name="Points"
+              domain={['dataMin - 40', 'dataMax + 40']}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+              width={50}
+            />
+            <Tooltip content={<EfficiencyTip ownerName={ownerName} />} cursor={{ strokeDasharray: '3 3' }} />
+            <Scatter name="Champion" data={champion} fill="var(--gold)" />
+            <Scatter name="Playoff" data={playoff} fill="var(--accent)" />
+            <Scatter name="Non-Playoff" data={out} fill="var(--ink-3)" />
+          </ScatterChart>
+        </ResponsiveContainer>
+        <div className="legend">
+          <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--gold)' }} /> Champion</span>
+          <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--accent)' }} /> Playoff team</span>
+          <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--ink-3)' }} /> Non-playoff</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RbBuildTip({ active, payload }: { active?: boolean; payload?: Array<{ payload: RbBuildPoint }> }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0].payload;
+  if (p.rbDollars == null) return null;
+  return (
+    <div className="tooltip-card">
+      <div className="tt-title">{p.teamName}</div>
+      <div className="tooltip-row"><span className="muted">RB auction $</span><span className="tnum">${fmt0(p.rbDollars)}</span></div>
+      <div className="tooltip-row"><span className="muted">RB starter pts</span><span className="tnum">{fmt0(p.rbPoints)}</span></div>
+    </div>
+  );
+}
+
+function BackfieldBuildSection({ rbBuild, year }: { rbBuild: RbBuildPoint[]; year: number }) {
+  const points = rbBuild.filter((p) => p.rbDollars > 0 || p.rbPoints > 0);
+  if (points.length < 2) return null;
+  const { slope, intercept } = linreg(points.map((p) => ({ x: p.rbDollars, y: p.rbPoints })));
+  const maxX = Math.max(...points.map((p) => p.rbDollars));
+  const trendData = [
+    { rbDollars: 0, trend: intercept },
+    { rbDollars: maxX, trend: intercept + slope * maxX },
+  ];
+  return (
+    <div className="section">
+      <SectionHead title="Backfield build" note={`RB auction $ spent vs. RB starter fantasy points, ${year}`} />
+      <div className="chart-card">
+        <ResponsiveContainer width="100%" height={360}>
+          <ComposedChart margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
+            <CartesianGrid stroke="var(--line)" />
+            <XAxis
+              type="number"
+              dataKey="rbDollars"
+              name="RB $"
+              unit="$"
+              domain={[0, 'dataMax + 10']}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+            />
+            <YAxis
+              type="number"
+              dataKey="rbPoints"
+              name="RB pts"
+              domain={[0, 'dataMax + 40']}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+              width={46}
+            />
+            <Tooltip content={<RbBuildTip />} cursor={{ strokeDasharray: '3 3' }} />
+            <Line
+              data={trendData}
+              dataKey="trend"
+              type="linear"
+              stroke="var(--ink-3)"
+              strokeDasharray="5 5"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={false}
+              legendType="none"
+              isAnimationActive={false}
+            />
+            <Scatter name="Teams" data={points} dataKey="rbPoints" fill="var(--s3)">
+              <LabelList dataKey="abbrev" position="top" fill="var(--ink-2)" fontSize={11} />
+            </Scatter>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+interface AgePoint {
+  teamId: number;
+  teamName: string;
+  avgAge: number;
+  powerPct: number;
+  champion: boolean;
+}
+
+function AgeTip({ active, payload }: { active?: boolean; payload?: Array<{ payload: AgePoint }> }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="tooltip-card">
+      <div className="tt-title">{p.teamName}</div>
+      <div className="tooltip-row"><span className="muted">Avg age</span><span className="tnum">{fmt(p.avgAge, 1)}</span></div>
+      <div className="tooltip-row"><span className="muted">Power win %</span><span className="tnum">{fmt(p.powerPct, 1)}%</span></div>
+    </div>
+  );
+}
+
+function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge | null; season: Season }) {
+  if (!rosterAge || !rosterAge.teams.length) return null;
+  const teamStatus = new Map(season.teams.map((t) => [t.teamId, t]));
+  const points: AgePoint[] = rosterAge.teams
+    .map((ra): AgePoint | null => {
+      const st = teamStatus.get(ra.teamId);
+      if (!st) return null;
+      return { teamId: ra.teamId, teamName: ra.teamName, avgAge: ra.avgAge, powerPct: st.powerPct * 100, champion: st.finalRank === 1 };
+    })
+    .filter((p): p is AgePoint => p != null);
+  if (!points.length) return null;
+
+  const oldest = [...rosterAge.teams].sort((a, b) => b.avgAge - a.avgAge)[0];
+  const youngest = [...rosterAge.teams].sort((a, b) => a.avgAge - b.avgAge)[0];
+  const champPoints = points.filter((p) => p.champion);
+  const otherPoints = points.filter((p) => !p.champion);
+  const firstName = (n: string) => n.split(' ')[0];
+
+  return (
+    <div className="section">
+      <SectionHead
+        title="Age is just a number"
+        note="Average age of every distinct starter that season vs. season-long Power win % — does roster age correlate with winning?"
+      />
+      <div className="grid cols-2" style={{ marginBottom: 16 }}>
+        <StatTile
+          label={`Oldest Roster · ${oldest.teamName}`}
+          value={`${fmt(oldest.avgAge, 1)} avg age`}
+          sub={oldest.oldest.map((p) => `${p.name} (${p.age})`).join(' · ')}
+        />
+        <StatTile
+          label={`Youngest Roster · ${youngest.teamName}`}
+          value={`${fmt(youngest.avgAge, 1)} avg age`}
+          accent="green"
+          sub={youngest.youngest.map((p) => `${p.name} (${p.age})`).join(' · ')}
+        />
+      </div>
+      <div className="chart-card">
+        <ResponsiveContainer width="100%" height={360}>
+          <ScatterChart margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
+            <CartesianGrid stroke="var(--line)" />
+            <XAxis
+              type="number"
+              dataKey="avgAge"
+              name="Avg Age"
+              domain={['dataMin - 0.5', 'dataMax + 0.5']}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+            />
+            <YAxis
+              type="number"
+              dataKey="powerPct"
+              name="Power Win %"
+              unit="%"
+              domain={[0, 100]}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+              width={46}
+            />
+            <Tooltip content={<AgeTip />} cursor={{ strokeDasharray: '3 3' }} />
+            <Scatter name="Teams" data={otherPoints} dataKey="powerPct" fill="var(--accent)">
+              <LabelList dataKey="teamName" position="top" fill="var(--ink-2)" fontSize={11} formatter={(v: unknown) => firstName(String(v))} />
+            </Scatter>
+            <Scatter name="Champion" data={champPoints} dataKey="powerPct" fill="var(--gold)">
+              <LabelList dataKey="teamName" position="top" fill="var(--gold-2)" fontSize={11} formatter={(v: unknown) => firstName(String(v))} />
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
+        <div className="legend">
+          <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--gold)' }} /> Champion</span>
+          <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--accent)' }} /> Other teams</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -12,8 +12,12 @@ import { useLeague } from '../data';
 import { PageHead, SectionHead, StatTile, Card, Badge, TrophyRow } from '../components/bits';
 import { OwnerChip, Avatar } from '../components/OwnerChip';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { fmt, fmt0, ordinal, pct, recordStr } from '../lib/util';
+import { RosterConstructionChart } from '../components/RosterConstructionChart';
+import { computeRosterConstruction } from '../lib/rosterConstruction';
+import { fmt, fmt0, ordinal, pct, posColor, recordStr } from '../lib/util';
 import type { H2HCell } from '../types';
+
+const POS_LEGEND = ['QB', 'RB', 'WR', 'TE', 'D/ST', 'K'];
 
 interface FinishPoint {
   year: number;
@@ -127,6 +131,8 @@ export function OwnerProfile() {
 
   const titlesAsc = [...at.titles].sort((a, b) => a - b);
   const goldTint = 'rgba(246, 199, 68, 0.07)';
+
+  const rosterConstruction = computeRosterConstruction(owner, league.seasons);
 
   const rivalCols: Column<Rival>[] = [
     {
@@ -338,6 +344,24 @@ export function OwnerProfile() {
           </table>
         </div>
       </div>
+
+      {/* ---------- roster construction (auction $ by year) ---------- */}
+      {rosterConstruction.length > 0 && (
+        <div className="section">
+          <SectionHead
+            title="Roster Construction"
+            note="Every player drafted, sized by auction $ — solid = price-implied starter, faded = bench"
+          />
+          <div className="legend" style={{ marginBottom: 12 }}>
+            {POS_LEGEND.map((pos) => (
+              <span className="legend-item" key={pos}>
+                <span className="legend-sq" style={{ background: posColor(pos) }} /> {pos}
+              </span>
+            ))}
+          </div>
+          <RosterConstructionChart years={rosterConstruction} />
+        </div>
+      )}
 
       {/* ---------- finish trajectory ---------- */}
       <div className="section">

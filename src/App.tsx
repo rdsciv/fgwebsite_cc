@@ -10,6 +10,7 @@ import { Drafts } from './pages/Drafts';
 import { Trends } from './pages/Trends';
 import { Scoreboard } from './pages/Scoreboard';
 import { RosterLab } from './pages/RosterLab';
+import { RotoStandings } from './pages/RotoStandings';
 
 const NAV = [
   { to: '/', label: 'Overview', end: true },
@@ -20,6 +21,7 @@ const NAV = [
   { to: '/seasons', label: 'Seasons' },
   { to: '/drafts', label: 'Drafts' },
   { to: '/roster-lab', label: 'Roster Lab' },
+  { to: '/roto-standings', label: 'Roto Standings' },
   { to: '/trends', label: 'Trends' },
 ];
 
@@ -83,6 +85,7 @@ export function App() {
           <Route path="/owners/:id" element={<OwnerProfile />} />
           <Route path="/drafts" element={<Drafts />} />
           <Route path="/roster-lab" element={<RosterLab />} />
+          <Route path="/roto-standings" element={<RotoStandings />} />
           <Route path="/trends" element={<Trends />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -294,6 +294,50 @@ table.data tbody tr:hover td:first-child { background: var(--surface-2); }
 .bar-track { background: var(--surface-2); border-radius: 6px; height: 10px; overflow: hidden; min-width: 60px; }
 .bar-fill { height: 100%; border-radius: 6px; background: var(--accent); }
 
+/* roster construction: per-year auction-$ stacked bar for one manager */
+.rc-chart { display: flex; flex-direction: column; gap: 8px; }
+.rc-row { display: grid; grid-template-columns: 52px 1fr 64px; align-items: center; gap: 12px; }
+.rc-year { font-family: var(--font-display); font-weight: 600; color: var(--ink-2); font-size: 14px; }
+.rc-bar { position: relative; display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.rc-seg { display: flex; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; border-right: 1px solid var(--bg-2); }
+.rc-seg:last-child { border-right: none; }
+.rc-label { font-size: 10px; font-weight: 700; color: rgba(0,0,0,.7); white-space: nowrap; padding: 0 3px; }
+.rc-divider { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--ink); opacity: .55; }
+.rc-total { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-family: var(--font-display); font-size: 15px; }
+
+/* roto standings teams picker */
+.roto-teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.roto-team-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); text-align: left; cursor: pointer; }
+.roto-team-card:hover { color: var(--ink); }
+.roto-team-card.active { border-color: var(--gold-deep); background: var(--surface-3); color: var(--ink); }
+.roto-team-rank { font-family: var(--font-display); font-weight: 700; color: var(--ink-3); font-size: 13px; }
+.roto-team-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* category breakdown table */
+.cb-table { font-size: 13px; }
+.cb-head, .cb-row { display: grid; grid-template-columns: 84px 100px 72px 64px 44px 1fr; gap: 10px; align-items: center; padding: 7px 4px; }
+.cb-head { font-size: 11px; text-transform: uppercase; color: var(--ink-3); letter-spacing: .04em; border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; }
+.cb-row { border-bottom: 1px solid var(--line); border-left: 3px solid transparent; padding-left: 10px; }
+.cb-row:last-child { border-bottom: none; }
+.cb-group { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; }
+.cb-pips { display: flex; gap: 3px; flex-wrap: wrap; }
+.cb-pip { width: 8px; height: 8px; border-radius: 2px; background: var(--surface-2); }
+.cb-total { border-top: 2px solid var(--line-strong); border-left-color: transparent !important; margin-top: 4px; padding-top: 12px; }
+
+/* skill radar panel */
+.skill-radar-grid { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: center; }
+.skill-radar-cols { display: flex; flex-direction: column; gap: 18px; }
+.skill-radar-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; margin-bottom: 6px; }
+.skill-radar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+@media (max-width: 720px) { .skill-radar-grid { grid-template-columns: 1fr; } }
+
+/* box-and-whisker (min/Q1/median/Q3/max) */
+.boxplot-track { position: relative; height: 26px; min-width: 160px; }
+.boxplot-whisker { position: absolute; top: 50%; height: 1px; background: var(--line-strong); transform: translateY(-50%); }
+.boxplot-tick { position: absolute; top: 50%; width: 1px; height: 10px; background: var(--ink-3); transform: translate(-50%, -50%); }
+.boxplot-box { position: absolute; top: 50%; height: 18px; border-radius: 4px; background: rgba(57,135,229,.28); border: 1px solid var(--accent); transform: translateY(-50%); cursor: default; }
+.boxplot-median { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); transform: translateX(-50%); }
+
 /* heatmap / matrix cells */
 .matrix { border-collapse: separate; border-spacing: 3px; font-variant-numeric: tabular-nums; }
 .matrix th { font-size: 11px; color: var(--ink-3); font-weight: 600; padding: 4px; }

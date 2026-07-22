@@ -75,6 +75,19 @@ function statLine(pos, st) {
   return parts.join(' · ');
 }
 
+// Raw per-category numerics behind the formatted statLine() string, for category-stat
+// features (Skill Radar / Roto Standings). Stat ids 0/1 (pass att/cmp) verified live: their
+// ratio exactly matches ESPN's own precomputed completion-% stat (id 21) for the same player-week.
+function rawStats(st) {
+  if (!st) return null;
+  const g = (id) => st[id] || 0;
+  return {
+    att: g(0), cmp: g(1), py: round2(g(3)), ptd: g(4),
+    car: g(23), ry: round2(g(24)), rtd: g(25),
+    rec: g(41), recy: round2(g(42)), retd: g(43),
+  };
+}
+
 function playerLine(entry, wk) {
   const ppe = entry.playerPoolEntry || {};
   const pl = ppe.player || {};
@@ -87,6 +100,7 @@ function playerLine(entry, wk) {
     tm: PRO[pl.proTeamId] ?? '',
     pt: pts,
     l: statLine(pl.defaultPositionId, actual?.stats),
+    st: rawStats(actual?.stats),
     slot: entry.lineupSlotId,
   };
 }
@@ -98,9 +112,9 @@ function sideBox(side, teamMeta, wk) {
   for (const e of entries) {
     const line = playerLine(e, wk);
     if (e.lineupSlotId === BENCH || e.lineupSlotId === IR) {
-      bench.push({ id: line.id, n: line.n, p: line.p, tm: line.tm, pt: line.pt, l: line.l, s: e.lineupSlotId === IR ? 'IR' : 'BE' });
+      bench.push({ id: line.id, n: line.n, p: line.p, tm: line.tm, pt: line.pt, l: line.l, st: line.st, s: e.lineupSlotId === IR ? 'IR' : 'BE' });
     } else {
-      starters.push({ id: line.id, n: line.n, p: line.p, tm: line.tm, pt: line.pt, l: line.l, s: SLOT[e.lineupSlotId] || String(e.lineupSlotId) });
+      starters.push({ id: line.id, n: line.n, p: line.p, tm: line.tm, pt: line.pt, l: line.l, st: line.st, s: SLOT[e.lineupSlotId] || String(e.lineupSlotId) });
     }
   }
   const benchTotal = round2(bench.reduce((a, b) => a + b.pt, 0));
