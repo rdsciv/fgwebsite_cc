@@ -34,6 +34,14 @@ export function SeasonPage({ year }: { year: number }) {
   const draftCap = season.draftType.charAt(0).toUpperCase() + season.draftType.slice(1);
   const hasDivisions = season.divisions.length > 0;
 
+  // ---- luck helpers ----
+  const pwrStr = (n: number) => n.toFixed(3).replace(/^(-?)0\./, '$1.');
+  const luckWins = (t: SeasonTeam) => t.regWins - t.expectedWins; // actual − expected reg-season wins
+  const signed = (n: number, d = 1) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(d);
+  const byLuck = [...season.teams].sort((a, b) => luckWins(b) - luckWins(a));
+  const luckiest = byLuck[0];
+  const unluckiest = byLuck[byLuck.length - 1];
+
   // ---- playoff bracket ----
   const wb = season.matchups.filter((m) => m.tier === 'WINNERS_BRACKET');
   const roundMps = [...new Set(wb.map((m) => m.mp))].sort((a, b) => a - b);
@@ -120,6 +128,47 @@ export function SeasonPage({ year }: { year: number }) {
       sortable: true,
       value: (t) => t.pa,
       render: (t) => <span className="tnum muted">{fmt(t.pa)}</span>,
+    },
+    {
+      key: 'pwr',
+      header: 'PWR',
+      sortable: true,
+      value: (t) => t.regPowerPct,
+      render: (t) => (
+        <span className="tnum" title="All-play win % — as if each team played every other team every week">
+          {pwrStr(t.regPowerPct)}
+        </span>
+      ),
+    },
+    {
+      key: 'xw',
+      header: 'xW',
+      sortable: true,
+      value: (t) => t.expectedWins,
+      render: (t) => (
+        <span className="tnum muted" title="Expected regular-season wins from all-play win %">
+          {fmt(t.expectedWins, 1)}
+        </span>
+      ),
+    },
+    {
+      key: 'luck',
+      header: 'Luck',
+      sortable: true,
+      value: (t) => luckWins(t),
+      render: (t) => {
+        const lw = luckWins(t);
+        const arrow = lw > 0.5 ? '▲' : lw < -0.5 ? '▼' : '';
+        return (
+          <span
+            className="tnum"
+            title={`Wins above/below expected · ${t.luckyWins} lucky win${t.luckyWins === 1 ? '' : 's'}, ${t.unluckyLosses} unlucky loss${t.unluckyLosses === 1 ? '' : 'es'}`}
+          >
+            {signed(lw)}
+            {arrow && <span className="muted" style={{ fontSize: 11, marginLeft: 3 }}>{arrow}</span>}
+          </span>
+        );
+      },
     },
     {
       key: 'seed',
@@ -228,14 +277,28 @@ export function SeasonPage({ year }: { year: number }) {
 
       {/* final standings */}
       <div className="section">
-        <SectionHead title="Final Standings" note={`All ${season.nTeams} teams, ranked`} />
+        <SectionHead
+          title="Final Standings"
+          note={`All ${season.nTeams} teams · PWR = all-play win %, xW = expected wins, Luck = wins above/below expected`}
+        />
         <SortableTable
           columns={columns}
           rows={season.teams}
           rowKey={(t) => t.teamId}
-          minWidth={hasDivisions ? 760 : 680}
+          minWidth={hasDivisions ? 900 : 820}
         />
       </div>
+
+      {/* luck report */}
+      {luckiest && unluckiest && luckiest.teamId !== unluckiest.teamId && (
+        <div className="section">
+          <SectionHead title="Luck Report" note="Who the schedule flattered — and who it robbed" />
+          <div className="grid cols-2">
+            <LuckCard team={luckiest} kind="lucky" ownerName={ownerName} luckWins={luckWins(luckiest)} signed={signed} pwrStr={pwrStr} />
+            <LuckCard team={unluckiest} kind="unlucky" ownerName={ownerName} luckWins={luckWins(unluckiest)} signed={signed} pwrStr={pwrStr} />
+          </div>
+        </div>
+      )}
 
       {/* playoff bracket */}
       {wb.length > 0 && (
@@ -371,5 +434,36 @@ function PodiumCard({
         <div className="podium-name muted">—</div>
       )}
     </div>
+  );
+}
+
+function LuckCard({
+  team,
+  kind,
+  ownerName,
+  luckWins,
+  signed,
+  pwrStr,
+}: {
+  team: SeasonTeam;
+  kind: 'lucky' | 'unlucky';
+  ownerName: (id: string) => string;
+  luckWins: number;
+  signed: (n: number, d?: number) => string;
+  pwrStr: (n: number) => string;
+}) {
+  return (
+    <Card className="card-pad">
+      <div className="stat-label">{kind === 'lucky' ? 'Luckiest Team 🍀' : 'Unluckiest Team 💔'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 }}>
+        <OwnerChip id={team.ownerId} name={ownerName(team.ownerId)} team={team.teamName} size={30} />
+        <span className="pill">{signed(luckWins)} vs expected</span>
+      </div>
+      <div className="record-sub" style={{ marginTop: 10 }}>
+        {recordStr(team.regWins, team.regLosses, team.regTies)} actual · {fmt(team.expectedWins, 1)} expected · PWR {pwrStr(team.regPowerPct)}
+        {kind === 'lucky' && team.luckyWins > 0 && <> · {team.luckyWins} lucky win{team.luckyWins === 1 ? '' : 's'}</>}
+        {kind === 'unlucky' && team.unluckyLosses > 0 && <> · {team.unluckyLosses} unlucky loss{team.unluckyLosses === 1 ? '' : 'es'}</>}
+      </div>
+    </Card>
   );
 }

@@ -221,6 +221,41 @@ for (const year of SEASONS) {
     }
   }
 
+  // regular-season all-play + luck (single-NFL-week regular-season games only, so a team's
+  // matchup score == its score that week). Luck compares each team's actual result to how it
+  // "should" have done against the whole league: expected wins from all-play win%, plus
+  // lucky wins (won while scoring in the bottom half that week) and unlucky losses (lost while
+  // scoring in the top half). All score-based, so every season 2014+ is fully supported.
+  const regByMp = new Map(); // mp -> [{teamId, score, result}]
+  for (const m of seasonMatchups) {
+    if (!m.isReg) continue;
+    const hres = m.winner === 'HOME' ? 'w' : m.winner === 'AWAY' ? 'l' : 't';
+    const ares = hres === 'w' ? 'l' : hres === 'l' ? 'w' : 't';
+    const arr = regByMp.get(m.mp) || [];
+    arr.push({ teamId: m.home.teamId, score: m.home.score, result: hres });
+    arr.push({ teamId: m.away.teamId, score: m.away.score, result: ares });
+    regByMp.set(m.mp, arr);
+  }
+  const regLuck = new Map(); // teamId -> {pw, pl, pt, lucky, unlucky}
+  const RL = (tid) => {
+    if (!regLuck.has(tid)) regLuck.set(tid, { pw: 0, pl: 0, pt: 0, lucky: 0, unlucky: 0 });
+    return regLuck.get(tid);
+  };
+  for (const rows of regByMp.values()) {
+    const med = quantile(rows.map((r) => r.score).sort((a, b) => a - b), 0.5);
+    for (const row of rows) {
+      const r = RL(row.teamId);
+      for (const other of rows) {
+        if (other.teamId === row.teamId) continue;
+        if (row.score > other.score) r.pw++;
+        else if (row.score < other.score) r.pl++;
+        else r.pt++;
+      }
+      if (row.result === 'w' && row.score < med) r.lucky++;
+      else if (row.result === 'l' && row.score > med) r.unlucky++;
+    }
+  }
+
   // regular-season ranking (win% then PF)
   const regRankOrder = [...teamMeta.keys()].sort((a, b) => {
     const A = S(a), B = S(b);
@@ -237,6 +272,11 @@ for (const year of SEASONS) {
     const s = S(tm.teamId);
     const p = power.get(tm.teamId) || { w: 0, l: 0, t: 0 };
     const pgp = p.w + p.l + p.t || 1;
+    const rl = regLuck.get(tm.teamId) || { pw: 0, pl: 0, pt: 0, lucky: 0, unlucky: 0 };
+    const regPgp = rl.pw + rl.pl + rl.pt || 1;
+    const regPowerPct = (rl.pw + rl.pt * 0.5) / regPgp;
+    const regGames = s.regW + s.regL + s.regT;
+    const regWinPct = regGames ? (s.regW + s.regT * 0.5) / regGames : 0;
     return {
       ...tm,
       wins: s.w, losses: s.l, ties: s.t,
@@ -251,6 +291,13 @@ for (const year of SEASONS) {
       lowWeek: s.weeks.length ? Math.min(...s.weeks) : 0,
       powerWins: p.w, powerLosses: p.l, powerTies: p.t,
       powerPct: Math.round(((p.w + p.t * 0.5) / pgp) * 1e4) / 1e4,
+      // regular-season luck suite (see regByMp/regLuck above)
+      regPowerPct: Math.round(regPowerPct * 1e4) / 1e4,
+      expectedWins: round2(regPowerPct * regGames),
+      luckIndex: Math.round((regWinPct - regPowerPct) * 1e4) / 1e4,
+      luckyWins: rl.lucky,
+      unluckyLosses: rl.unlucky,
+      netLuck: rl.lucky - rl.unlucky,
     };
   });
   teams.sort((a, b) => (a.finalRank || 99) - (b.finalRank || 99));

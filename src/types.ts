@@ -136,6 +136,13 @@ export interface SeasonTeam {
   powerLosses: number;
   powerTies: number;
   powerPct: number;
+  // regular-season luck suite (score-based, all seasons)
+  regPowerPct: number; // all-play win% over the regular season
+  expectedWins: number; // regPowerPct × regular-season games
+  luckIndex: number; // regular-season win% − regPowerPct
+  luckyWins: number; // wins while scoring in the bottom half that week
+  unluckyLosses: number; // losses while scoring in the top half that week
+  netLuck: number; // luckyWins − unluckyLosses
 }
 
 export type MatchupWinner = 'HOME' | 'AWAY' | 'TIE' | 'UNDECIDED';
