@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLeague } from '../data';
-import { PageHead, SectionHead, StatTile, Card } from '../components/bits';
+import { SectionHead, StatTile, Card } from '../components/bits';
+import logo from '../assets/affl-logo.png';
 import { OwnerChip, Avatar } from '../components/OwnerChip';
 import { fmt0, ordinal, pct, recordStr } from '../lib/util';
 
@@ -22,16 +23,13 @@ export function Overview() {
 
   return (
     <div className="page">
-      <PageHead
-        eyebrow="League History"
-        title="The AFFL, in full"
-        lede={
-          <>
-            {meta.nSeasons} seasons of the Amateur Fantasy Football League — every champion, rivalry,
-            blowout and draft-day steal from {meta.firstSeason} to {meta.lastSeason}, in one place.
-          </>
-        }
-      />
+      <header className="page-head brand-head">
+        <img className="brand-logo" src={logo} alt="" />
+        <div>
+          <div className="page-eyebrow">League History</div>
+          <h1 className="page-title">AFFL</h1>
+        </div>
+      </header>
 
       <div className="grid cols-4">
         <StatTile label="Seasons" value={meta.nSeasons} accent="gold" sub={`${meta.firstSeason}–${meta.lastSeason}`} />

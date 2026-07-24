@@ -99,15 +99,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; margin: 0; 
   border-bottom: 1px solid var(--line);
 }
 .nav-inner { max-width: var(--maxw); margin: 0 auto; height: 100%; display: flex; align-items: center; gap: 6px; padding: 0 20px; }
-.brand { display: flex; align-items: center; gap: 11px; margin-right: 14px; }
-.brand-mark {
-  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 700; font-size: 20px; color: #1a1206;
-  background: linear-gradient(145deg, var(--gold-2), var(--gold-deep));
-  box-shadow: 0 4px 14px rgba(246,199,68,.28); flex: none;
-}
-.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: .04em; line-height: 1; }
-.brand-sub { font-size: 10px; letter-spacing: .22em; color: var(--ink-3); text-transform: uppercase; }
+.brand { display: flex; align-items: center; margin-right: 14px; flex: none; }
+/* both brand assets ship on a pure-black field — screen drops it into the dark theme */
+.brand-banner { height: 46px; width: auto; display: block; mix-blend-mode: screen; }
 .nav-links { display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .nav-links::-webkit-scrollbar { display: none; }
 .nav-link {
@@ -123,6 +117,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; margin: 0; 
 .page-eyebrow { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
 .page-title { font-size: clamp(30px, 4.4vw, 46px); margin-top: 6px; }
 .page-lede { color: var(--ink-2); margin-top: 8px; max-width: 65ch; font-size: 15px; }
+.brand-head { display: flex; align-items: center; gap: 18px; }
+.brand-logo { width: clamp(84px, 12vw, 128px); height: auto; flex: none; mix-blend-mode: screen; }
 .section { margin-top: 40px; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .section-title { font-size: 24px; letter-spacing: .02em; }

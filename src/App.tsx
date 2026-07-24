@@ -11,6 +11,7 @@ import { Trends } from './pages/Trends';
 import { Scoreboard } from './pages/Scoreboard';
 import { RosterLab } from './pages/RosterLab';
 import { RotoStandings } from './pages/RotoStandings';
+import banner from './assets/affl-banner.jpg';
 
 const NAV = [
   { to: '/', label: 'Overview', end: true },
@@ -26,16 +27,11 @@ const NAV = [
 ];
 
 function Nav() {
-  const { league } = useLeague();
   return (
     <nav className="nav">
       <div className="nav-inner">
-        <NavLink to="/" className="brand">
-          <span className="brand-mark">A</span>
-          <span>
-            <span className="brand-name">AFFL</span>
-            <span className="brand-sub" style={{ display: 'block' }}>History · {league.meta.firstSeason}–{league.meta.lastSeason}</span>
-          </span>
+        <NavLink to="/" className="brand" aria-label="AFFL">
+          <img className="brand-banner" src={banner} alt="AFFL" />
         </NavLink>
         <div className="nav-links">
           {NAV.map((n) => (
