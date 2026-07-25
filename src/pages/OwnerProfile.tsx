@@ -189,22 +189,21 @@ export function OwnerProfile() {
       {/* ---------- hero header ---------- */}
       <header className="page-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-          <Avatar id={owner.id} name={owner.name} size={60} />
+          <Avatar id={owner.id} name={owner.teamNames[owner.teamNames.length - 1] ?? owner.name} size={60} />
           <div style={{ minWidth: 0 }}>
-            <div className="page-eyebrow">Manager Profile</div>
+            <div className="page-eyebrow">Franchise</div>
             <h1 className="page-title" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              {owner.name}
+              {owner.teamNames[owner.teamNames.length - 1] ?? owner.name}
               {maxYr != null && maxYr < league.meta.lastSeason && (
                 <span className="badge former" style={{ fontSize: 12 }}>
                   Former · last played {maxYr}
                 </span>
               )}
             </h1>
-            {owner.teamNames.length > 0 && (
-              <div className="page-lede" style={{ marginTop: 6 }}>
-                {owner.teamNames.join(' · ')}
-              </div>
-            )}
+            <div className="page-lede" style={{ marginTop: 6 }}>
+              Manager: {owner.name}
+              {owner.teamNames.length > 1 ? ` · also known as ${owner.teamNames.slice(0, -1).join(' · ')}` : ''}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
             {at.championships > 0 && (
@@ -263,7 +262,7 @@ export function OwnerProfile() {
         <div className="section">
           <SectionHead
             title="Trophy Case"
-            note={`${at.championships} championship${at.championships > 1 ? 's' : ''} in ${owner.name.split(' ')[0]}'s cabinet`}
+            note={`${at.championships} championship${at.championships > 1 ? 's' : ''} in ${owner.name}'s cabinet`}
           />
           <div className="chip-row">
             {titlesAsc.map((y) => (

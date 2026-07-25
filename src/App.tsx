@@ -28,20 +28,27 @@ const NAV = [
 
 function Nav() {
   return (
-    <nav className="nav">
-      <div className="nav-inner">
-        <NavLink to="/" className="brand" aria-label="AFFL">
-          <img className="brand-banner" src={banner} alt="AFFL" />
-        </NavLink>
-        <div className="nav-links">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              {n.label}
-            </NavLink>
-          ))}
+    <header className="site-header">
+      <NavLink to="/" className="site-banner" aria-label="AFFL home">
+        <img className="site-banner-img" src={banner} alt="AFFL" />
+      </NavLink>
+      <nav className="nav">
+        <div className="nav-inner">
+          <div className="nav-links">
+            {NAV.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.end}
+                className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}
+              >
+                {n.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
 

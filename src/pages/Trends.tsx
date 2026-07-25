@@ -17,7 +17,6 @@ import { OwnerChip } from '../components/OwnerChip';
 import { BoxPlotRow } from '../components/BoxPlotRow';
 import { fmt, fmt0, ordinal, SERIES, clsx } from '../lib/util';
 
-const firstName = (n: string) => n.trim().split(/\s+/)[0];
 const MAX_TRAJ = 6;
 
 interface TipItem {
@@ -277,8 +276,10 @@ export function Trends() {
                 <CartesianGrid stroke="var(--line)" vertical={false} />
                 <XAxis
                   dataKey="name"
-                  tickFormatter={firstName}
                   interval={0}
+                  angle={-30}
+                  textAnchor="end"
+                  height={78}
                   tick={axisTick}
                   axisLine={{ stroke: 'var(--line)' }}
                   tickLine={{ stroke: 'var(--line)' }}
@@ -329,7 +330,7 @@ export function Trends() {
                   aria-pressed={on}
                 >
                   <span className="sw" style={{ background: colorOf(o.id) }} />
-                  {firstName(o.name)}
+                  {o.name}
                 </button>
               );
             })}

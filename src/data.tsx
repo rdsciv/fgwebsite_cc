@@ -5,10 +5,27 @@ interface Ctx {
   league: League;
   ownerById: Map<string, Owner>;
   seasonByYear: Map<number, Season>;
+  /** Public-facing franchise / team label (preferred everywhere on the site). */
   ownerName: (id: string) => string;
+  /** Legal manager name for owner tracking / profile headers. */
+  managerName: (id: string) => string;
+  /** Most recent (or year-specific) team name for an owner. */
+  teamLabel: (id: string, year?: number) => string;
 }
 
 const LeagueContext = createContext<Ctx | null>(null);
+
+function latestTeamName(o: Owner | undefined, year?: number): string | null {
+  if (!o) return null;
+  if (year != null) {
+    const s = o.seasons.find((x) => x.year === year);
+    if (s?.teamName) return s.teamName;
+  }
+  const sorted = [...o.seasons].sort((a, b) => b.year - a.year);
+  if (sorted[0]?.teamName) return sorted[0].teamName;
+  if (o.teamNames?.length) return o.teamNames[o.teamNames.length - 1];
+  return null;
+}
 
 export function LeagueProvider({ children }: { children: ReactNode }) {
   const [league, setLeague] = useState<League | null>(null);
@@ -28,9 +45,15 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     if (!league) return null;
     const ownerById = new Map(league.owners.map((o) => [o.id, o]));
     const seasonByYear = new Map(league.seasons.map((s) => [s.year, s]));
-    const ownerName = (id: string) =>
-      league.ownerNames[id] ?? ownerById.get(id)?.name ?? 'Unknown Manager';
-    return { league, ownerById, seasonByYear, ownerName };
+    const managerName = (id: string) =>
+      league.ownerNames[id] ?? ownerById.get(id)?.displayName ?? ownerById.get(id)?.name ?? 'Unknown Manager';
+    const teamLabel = (id: string, year?: number) => {
+      const o = ownerById.get(id);
+      return latestTeamName(o, year) ?? managerName(id);
+    };
+    // Site-wide default display is franchise/team name; owner ids still track managers.
+    const ownerName = (id: string) => teamLabel(id);
+    return { league, ownerById, seasonByYear, ownerName, managerName, teamLabel };
   }, [league]);
 
   if (error) {

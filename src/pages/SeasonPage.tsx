@@ -203,7 +203,7 @@ export function SeasonPage({ year }: { year: number }) {
         lede={
           season.champion ? (
             <>
-              {ownerName(season.champion.ownerId)} captured the {year} title with the{' '}
+              {season.champion.teamName} captured the {year} title with the{' '}
               <span className="em-gold">{season.champion.teamName}</span> — a {season.nTeams}-team,{' '}
               {season.draftType}-draft campaign.
             </>

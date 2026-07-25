@@ -155,9 +155,9 @@ function RosterAnalysis({
   return (
     <>
       <div className="grid cols-4">
-        <StatTile label="Most Self-Made" value={ownerName(selfMade.ownerId).split(' ')[0]} accent="blue" sub={<><span className="em">{pctOf(selfMade.ptsDraft, selfMade.starterPts).toFixed(0)}%</span> of points from own draft picks</>} />
-        <StatTile label="Best Trader" value={ownerName(trader.ownerId).split(' ')[0]} accent="gold" sub={<><span className="em">{fmt0(trader.ptsTrade)}</span> starting pts via trade</>} />
-        <StatTile label="Waiver-Wire King" value={ownerName(wireGM.ownerId).split(' ')[0]} accent="green" sub={<><span className="em">{fmt0(wireGM.ptsWaiver + wireGM.ptsFA)}</span> pts off waivers & FA</>} />
+        <StatTile label="Most Self-Made" value={ownerName(selfMade.ownerId)} accent="blue" sub={<><span className="em">{pctOf(selfMade.ptsDraft, selfMade.starterPts).toFixed(0)}%</span> of points from own draft picks</>} />
+        <StatTile label="Best Trader" value={ownerName(trader.ownerId)} accent="gold" sub={<><span className="em">{fmt0(trader.ptsTrade)}</span> starting pts via trade</>} />
+        <StatTile label="Waiver-Wire King" value={ownerName(wireGM.ownerId)} accent="green" sub={<><span className="em">{fmt0(wireGM.ptsWaiver + wireGM.ptsFA)}</span> pts off waivers & FA</>} />
         <StatTile label="Value of the Draft" value={valuePick ? `${valuePick.ppd}×` : '—'} sub={valuePick ? <>{valuePick.player} · ${valuePick.bid} → {fmt0(valuePick.pts)} pts</> : ''} />
       </div>
 
@@ -491,7 +491,6 @@ function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge
   const youngest = [...rosterAge.teams].sort((a, b) => a.avgAge - b.avgAge)[0];
   const champPoints = points.filter((p) => p.champion);
   const otherPoints = points.filter((p) => !p.champion);
-  const firstName = (n: string) => n.split(' ')[0];
 
   return (
     <div className="section">
@@ -538,10 +537,10 @@ function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge
             />
             <Tooltip content={<AgeTip />} cursor={{ strokeDasharray: '3 3' }} />
             <Scatter name="Teams" data={otherPoints} dataKey="powerPct" fill="var(--accent)">
-              <LabelList dataKey="teamName" position="top" fill="var(--ink-2)" fontSize={11} formatter={(v: unknown) => firstName(String(v))} />
+              <LabelList dataKey="teamName" position="top" fill="var(--ink-2)" fontSize={11} formatter={(v: unknown) => String(v)} />
             </Scatter>
             <Scatter name="Champion" data={champPoints} dataKey="powerPct" fill="var(--gold)">
-              <LabelList dataKey="teamName" position="top" fill="var(--gold-2)" fontSize={11} formatter={(v: unknown) => firstName(String(v))} />
+              <LabelList dataKey="teamName" position="top" fill="var(--gold-2)" fontSize={11} formatter={(v: unknown) => String(v)} />
             </Scatter>
           </ScatterChart>
         </ResponsiveContainer>
