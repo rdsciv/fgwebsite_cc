@@ -14,7 +14,8 @@
     "refresh": "node scripts/fetch-espn.mjs && node scripts/build-data.mjs && node scripts/build-boxscores.mjs && node scripts/build-transactions.mjs && node scripts/fetch-player-ages.mjs && node scripts/build-roster-age.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "shots": "node scripts/shots.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
