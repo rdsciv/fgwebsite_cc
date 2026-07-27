@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fgwebsite Cc"
+  short_description: "Repo-specific patterns and workflows for fgwebsite_cc"
+  default_prompt: "Use the fgwebsite_cc repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
