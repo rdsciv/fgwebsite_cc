@@ -51,8 +51,8 @@ export function SkillRadarPanel({
             <PolarGrid stroke="var(--line)" />
             <PolarAngleAxis dataKey="label" tick={{ fill: 'var(--ink-3)', fontSize: 11 }} />
             <PolarRadiusAxis domain={[0, 1]} tick={false} axisLine={false} tickCount={2} />
-            <Radar name={team.teamName} dataKey="team" stroke="var(--s3)" fill="var(--s3)" fillOpacity={0.3} strokeWidth={2} />
-            <Radar name="League Avg" dataKey="avg" stroke="var(--ink-3)" fill="none" strokeDasharray="4 4" strokeWidth={1.5} />
+            <Radar name={team.teamName} dataKey="team" stroke="var(--s3)" fill="var(--s3)" fillOpacity={0.3} strokeWidth={2} isAnimationActive={false} />
+            <Radar name="League Avg" dataKey="avg" stroke="var(--ink-3)" fill="none" strokeDasharray="4 4" strokeWidth={1.5} isAnimationActive={false} />
           </RadarChart>
         </ResponsiveContainer>
       </div>

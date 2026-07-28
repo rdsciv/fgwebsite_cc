@@ -21,7 +21,7 @@ import { loadRosterAge } from '../lib/rosterAge';
 import { computeSeasonAnalysis, type PickROI, type TeamRosterAnalysis, type Trade, type TradePlayer } from '../lib/analysis';
 import { computeTeamPotential, type TeamPotential } from '../lib/idealLineup';
 import { computeRbBuild, type RbBuildPoint } from '../lib/rbBuild';
-import { clsx, fmt, fmt0, linreg, posColor } from '../lib/util';
+import { clsx, correlationNote, fmt, fmt0, linreg, posColor } from '../lib/util';
 import type { Season, SeasonBox, SeasonRosterAge } from '../types';
 
 const axisTick = { fill: 'var(--ink-3)', fontSize: 12 };
@@ -351,8 +351,8 @@ function ManagementEfficiencySection({ potential, season, ownerName }: { potenti
               type="number"
               dataKey="pctOfIdeal"
               name="Efficiency"
-              unit="%"
               domain={['dataMin - 1', 'dataMax + 1']}
+              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
@@ -362,15 +362,16 @@ function ManagementEfficiencySection({ potential, season, ownerName }: { potenti
               dataKey="actualPts"
               name="Points"
               domain={['dataMin - 40', 'dataMax + 40']}
+              tickFormatter={(v: number) => fmt0(v)}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
               width={50}
             />
             <Tooltip content={<EfficiencyTip ownerName={ownerName} />} cursor={{ strokeDasharray: '3 3' }} />
-            <Scatter name="Champion" data={champion} fill="var(--gold)" />
-            <Scatter name="Playoff" data={playoff} fill="var(--accent)" />
-            <Scatter name="Non-Playoff" data={out} fill="var(--ink-3)" />
+            <Scatter name="Champion" data={champion} fill="var(--gold)" isAnimationActive={false} />
+            <Scatter name="Playoff" data={playoff} fill="var(--accent)" isAnimationActive={false} />
+            <Scatter name="Non-Playoff" data={out} fill="var(--ink-3)" isAnimationActive={false} />
           </ScatterChart>
         </ResponsiveContainer>
         <div className="legend">
@@ -398,16 +399,28 @@ function RbBuildTip({ active, payload }: { active?: boolean; payload?: Array<{ p
 
 function BackfieldBuildSection({ rbBuild, year }: { rbBuild: RbBuildPoint[]; year: number }) {
   const points = rbBuild.filter((p) => p.rbDollars > 0 || p.rbPoints > 0);
+  const [hoverId, setHoverId] = useState<number | null>(null);
   if (points.length < 2) return null;
-  const { slope, intercept } = linreg(points.map((p) => ({ x: p.rbDollars, y: p.rbPoints })));
+
+  const { slope, intercept, r, n } = linreg(points.map((p) => ({ x: p.rbDollars, y: p.rbPoints })));
+  const minX = Math.min(...points.map((p) => p.rbDollars));
   const maxX = Math.max(...points.map((p) => p.rbDollars));
+  const lo = Math.max(0, minX - 5);
   const trendData = [
-    { rbDollars: 0, trend: intercept },
-    { rbDollars: maxX, trend: intercept + slope * maxX },
+    { rbDollars: lo, trend: intercept + slope * lo },
+    { rbDollars: maxX + 10, trend: intercept + slope * (maxX + 10) },
   ];
+
+  // Points-per-dollar ranks the table; the chart shows shape, the table names names.
+  const ranked = [...points].sort((a, b) => b.rbPoints / (b.rbDollars || 1) - a.rbPoints / (a.rbDollars || 1));
+
   return (
     <div className="section">
-      <SectionHead title="Backfield build" note={`RB auction $ spent vs. RB starter fantasy points, ${year}`} />
+      <SectionHead
+        title="Backfield build"
+        note={`RB auction $ spent vs. RB starter fantasy points, ${year}`}
+        right={<span className="fit-note">{correlationNote(r, n)}</span>}
+      />
       <div className="chart-card">
         <ResponsiveContainer width="100%" height={360}>
           <ComposedChart margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
@@ -416,8 +429,8 @@ function BackfieldBuildSection({ rbBuild, year }: { rbBuild: RbBuildPoint[]; yea
               type="number"
               dataKey="rbDollars"
               name="RB $"
-              unit="$"
-              domain={[0, 'dataMax + 10']}
+              domain={[lo, maxX + 10]}
+              tickFormatter={(v: number) => `$${fmt0(v)}`}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
@@ -426,7 +439,8 @@ function BackfieldBuildSection({ rbBuild, year }: { rbBuild: RbBuildPoint[]; yea
               type="number"
               dataKey="rbPoints"
               name="RB pts"
-              domain={[0, 'dataMax + 40']}
+              domain={['dataMin - 40', 'dataMax + 40']}
+              tickFormatter={(v: number) => fmt0(v)}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
@@ -445,11 +459,59 @@ function BackfieldBuildSection({ rbBuild, year }: { rbBuild: RbBuildPoint[]; yea
               legendType="none"
               isAnimationActive={false}
             />
-            <Scatter name="Teams" data={points} dataKey="rbPoints" fill="var(--s3)">
-              <LabelList dataKey="abbrev" position="top" fill="var(--ink-2)" fontSize={11} />
-            </Scatter>
+            {/* No point labels: ESPN `abbrev` is emoji for most teams and stale for the rest.
+                Identity lives in the tooltip and the table below, always as the full name. */}
+            <Scatter
+              name="Teams"
+              data={points}
+              dataKey="rbPoints"
+              fill="var(--s3)"
+              isAnimationActive={false}
+              shape={(props: unknown) => {
+                const { cx, cy, payload } = props as { cx: number; cy: number; payload: RbBuildPoint };
+                const on = hoverId === payload.teamId;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={on ? 9 : 6.5}
+                    fill="var(--s3)"
+                    fillOpacity={hoverId == null || on ? 0.9 : 0.28}
+                    stroke="var(--bg)"
+                    strokeWidth={1.5}
+                  />
+                );
+              }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+      <div className="chart-table">
+        <table>
+          <thead>
+            <tr>
+              <th className="left">Team</th>
+              <th>RB auction $</th>
+              <th>RB starter pts</th>
+              <th>Pts per $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map((p) => (
+              <tr
+                key={p.teamId}
+                className={clsx(hoverId === p.teamId && 'row-on')}
+                onMouseEnter={() => setHoverId(p.teamId)}
+                onMouseLeave={() => setHoverId(null)}
+              >
+                <td className="left">{p.teamName}</td>
+                <td className="tnum">${fmt0(p.rbDollars)}</td>
+                <td className="tnum">{fmt0(p.rbPoints)}</td>
+                <td className="tnum">{p.rbDollars > 0 ? fmt(p.rbPoints / p.rbDollars, 1) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -491,12 +553,15 @@ function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge
   const youngest = [...rosterAge.teams].sort((a, b) => a.avgAge - b.avgAge)[0];
   const champPoints = points.filter((p) => p.champion);
   const otherPoints = points.filter((p) => !p.champion);
+  const ageFit = linreg(points.map((p) => ({ x: p.avgAge, y: p.powerPct })));
+  const ageRanked = [...points].sort((a, b) => b.powerPct - a.powerPct);
 
   return (
     <div className="section">
       <SectionHead
         title="Age is just a number"
         note="Average age of every distinct starter that season vs. season-long Power win % — does roster age correlate with winning?"
+        right={<span className="fit-note">{correlationNote(ageFit.r, ageFit.n)}</span>}
       />
       <div className="grid cols-2" style={{ marginBottom: 16 }}>
         <StatTile
@@ -520,6 +585,7 @@ function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge
               dataKey="avgAge"
               name="Avg Age"
               domain={['dataMin - 0.5', 'dataMax + 0.5']}
+              tickFormatter={(v: number) => fmt(v, 1)}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
@@ -528,26 +594,44 @@ function AgeVsSuccessSection({ rosterAge, season }: { rosterAge: SeasonRosterAge
               type="number"
               dataKey="powerPct"
               name="Power Win %"
-              unit="%"
               domain={[0, 100]}
+              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
               tick={axisTick}
               axisLine={{ stroke: 'var(--line)' }}
               tickLine={{ stroke: 'var(--line)' }}
               width={46}
             />
             <Tooltip content={<AgeTip />} cursor={{ strokeDasharray: '3 3' }} />
-            <Scatter name="Teams" data={otherPoints} dataKey="powerPct" fill="var(--accent)">
-              <LabelList dataKey="teamName" position="top" fill="var(--ink-2)" fontSize={11} formatter={(v: unknown) => String(v)} />
-            </Scatter>
-            <Scatter name="Champion" data={champPoints} dataKey="powerPct" fill="var(--gold)">
-              <LabelList dataKey="teamName" position="top" fill="var(--gold-2)" fontSize={11} formatter={(v: unknown) => String(v)} />
-            </Scatter>
+            {/* Twelve full team names at 11px overlap into mush; identity lives in the
+                tooltip and the table below, where the whole name always fits. */}
+            <Scatter name="Teams" data={otherPoints} dataKey="powerPct" fill="var(--accent)" isAnimationActive={false} />
+            <Scatter name="Champion" data={champPoints} dataKey="powerPct" fill="var(--gold)" isAnimationActive={false} />
           </ScatterChart>
         </ResponsiveContainer>
         <div className="legend">
           <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--gold)' }} /> Champion</span>
           <span className="legend-item"><span className="legend-sq" style={{ background: 'var(--accent)' }} /> Other teams</span>
         </div>
+      </div>
+      <div className="chart-table">
+        <table>
+          <thead>
+            <tr>
+              <th className="left">Team</th>
+              <th>Avg starter age</th>
+              <th>Power win %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ageRanked.map((p) => (
+              <tr key={p.teamId}>
+                <td className="left">{p.teamName}{p.champion && <span className="champ-dot" title="Champion"> 🏆</span>}</td>
+                <td className="tnum">{fmt(p.avgAge, 1)}</td>
+                <td className="tnum">{p.powerPct.toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

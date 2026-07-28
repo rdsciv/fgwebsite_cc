@@ -23,7 +23,7 @@ function SpendBar({
   amount,
   max,
   color,
-  labelWidth = 150,
+  labelWidth = 186,
   highlight = false,
 }: {
   leading: ReactNode;
@@ -382,53 +382,55 @@ export function Drafts() {
             )}
           </div>
 
-          <div className="two-col" style={{ marginTop: 16 }}>
-            <Card>
-              <div className="card-head">
-                <span className="card-title">Spending by Manager</span>
-                <span className="card-hint">total auction dollars</span>
-              </div>
-              <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 12 }}>
-                {auctionAgg.byManager.map((m, i) => (
-                  <SpendBar
-                    key={m.id}
-                    leading={<OwnerChip id={m.id} name={m.name} size={22} />}
-                    amount={m.total}
-                    max={auctionAgg.maxManager}
-                    color="var(--accent)"
-                    highlight={i === 0}
-                  />
-                ))}
-              </div>
-            </Card>
-
-            <Card>
-              <div className="card-head">
-                <span className="card-title">Spending by Position</span>
-                <span className="card-hint">where the money went</span>
-              </div>
-              <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 12 }}>
+          {/* One full-width strip: positions summarise in a single stacked bar, so the
+              manager list below is not sitting beside 280px of empty column. */}
+          <Card style={{ marginTop: 12 }}>
+            <div className="card-head">
+              <span className="card-title">Where the money went</span>
+              <span className="card-hint">share of auction dollars by position</span>
+            </div>
+            <div className="card-pad">
+              <div className="spend-stack">
                 {auctionAgg.byPos.map((r) => (
-                  <SpendBar
+                  <div
                     key={r.pos}
-                    labelWidth={96}
-                    leading={
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontWeight: 600 }}>
-                        <PosDot pos={r.pos} size={11} />
-                        {r.pos}
-                        <span className="muted" style={{ fontSize: 12, fontWeight: 500 }}>
-                          {r.count}
-                        </span>
-                      </span>
-                    }
-                    amount={r.total}
-                    max={auctionAgg.maxPos}
-                    color={posColor(r.pos)}
+                    className="spend-seg"
+                    style={{ width: `${(r.total / auctionAgg.total) * 100}%`, background: posColor(r.pos) }}
+                    title={`${r.pos} · $${fmt0(r.total)} · ${r.count} players`}
                   />
                 ))}
               </div>
-            </Card>
-          </div>
+              <div className="spend-key">
+                {auctionAgg.byPos.map((r) => (
+                  <span key={r.pos} className="spend-key-item">
+                    <PosDot pos={r.pos} size={10} />
+                    <b>{r.pos}</b>
+                    <span className="tnum">${fmt0(r.total)}</span>
+                    <span className="muted">{r.count} players</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card style={{ marginTop: 12 }}>
+            <div className="card-head">
+              <span className="card-title">Spending by Manager</span>
+              <span className="card-hint">total auction dollars</span>
+            </div>
+            <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 12 }}>
+              {auctionAgg.byManager.map((m, i) => (
+                <SpendBar
+                  key={m.id}
+                  leading={<OwnerChip id={m.id} name={m.name} size={22} />}
+                  amount={m.total}
+                  max={auctionAgg.maxManager}
+                  color="var(--accent)"
+                  highlight={i === 0}
+                />
+              ))}
+            </div>
+          </Card>
 
           <div style={{ marginTop: 16 }}>
             <SortableTable

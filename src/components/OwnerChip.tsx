@@ -29,6 +29,9 @@ export function OwnerChip({
   size?: number;
   link?: boolean;
 }) {
+  // Site-wide display name is already the team name, so callers that also pass the
+  // team end up printing it twice. Drop the sub-line when it says nothing new.
+  const showTeam = team != null && !(typeof team === 'string' && team.trim() === name.trim());
   const inner = (
     <span className="owner-chip">
       <Avatar id={id} name={name} size={size} />
@@ -37,7 +40,7 @@ export function OwnerChip({
           <span className="owner-nm">{name}</span>
           {tag}
         </span>
-        {team && <span className="owner-team" style={{ display: 'block' }}>{team}</span>}
+        {showTeam && <span className="owner-team" style={{ display: 'block' }}>{team}</span>}
       </span>
     </span>
   );

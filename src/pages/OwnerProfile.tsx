@@ -1,8 +1,11 @@
 import { Link, useParams } from 'react-router-dom';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,11 +16,23 @@ import { PageHead, SectionHead, StatTile, Card, Badge, TrophyRow } from '../comp
 import { OwnerChip, Avatar } from '../components/OwnerChip';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { RosterConstructionChart } from '../components/RosterConstructionChart';
+import { BoxPlotRow } from '../components/BoxPlotRow';
 import { computeRosterConstruction } from '../lib/rosterConstruction';
+import {
+  distribution,
+  histogram,
+  mean,
+  ownerScores,
+  seasonDistributions,
+  sharedDomain,
+  stdev,
+} from '../lib/scoreDist';
 import { fmt, fmt0, ordinal, pct, posColor, recordStr } from '../lib/util';
-import type { H2HCell } from '../types';
+import type { H2HCell, League } from '../types';
 
 const POS_LEGEND = ['QB', 'RB', 'WR', 'TE', 'D/ST', 'K'];
+
+const axisTick = { fill: 'var(--ink-3)', fontSize: 12 };
 
 interface FinishPoint {
   year: number;
@@ -274,6 +289,9 @@ export function OwnerProfile() {
         </div>
       )}
 
+      {/* ---------- scoring distribution: shape of every week, career and by season ---------- */}
+      <ScoringDistribution league={league} ownerId={owner.id} />
+
       {/* ---------- season by season ---------- */}
       <div className="section">
         <SectionHead title="Season by Season" note="Every campaign, in order" />
@@ -390,6 +408,7 @@ export function OwnerProfile() {
               <Line
                 type="monotone"
                 dataKey="rank"
+                isAnimationActive={false}
                 stroke="var(--gold)"
                 strokeWidth={2.5}
                 connectNulls
@@ -442,6 +461,97 @@ export function OwnerProfile() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Scoring distribution — the shape of a manager's weeks, not just the total.
+ * Career histogram with median/mean markers, plus one box plot per season on a
+ * shared domain so the seasons are visually comparable.
+ */
+function ScoringDistribution({ league, ownerId }: { league: League; ownerId: string }) {
+  const all = ownerScores(league, ownerId);
+  const career = distribution(all);
+  if (!career) return null;
+
+  const bySeason = seasonDistributions(league, ownerId);
+  const domain = sharedDomain([career, ...bySeason.map((s) => s.dist)]);
+  const bins = histogram(all, career.min, career.max, 10);
+  const avg = mean(all);
+  const sd = stdev(all);
+
+  return (
+    <div className="section">
+      <SectionHead
+        title="Scoring Distribution"
+        note={`All ${career.n} single-week scores this franchise has posted · multi-week playoff aggregates excluded`}
+      />
+
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+        <StatTile label="Median Week" value={fmt(career.median, 1)} accent="gold" sub={`half of weeks landed above this`} />
+        <StatTile label="Average Week" value={fmt(avg, 1)} sub={`± ${fmt(sd, 1)} typical swing`} />
+        <StatTile label="Middle 50%" value={`${fmt(career.q1, 1)}–${fmt(career.q3, 1)}`} accent="blue" sub="interquartile range" />
+        <StatTile label="Full Range" value={`${fmt(career.min, 1)}–${fmt(career.max, 1)}`} accent="green" sub="worst to best week" />
+      </div>
+
+      <div className="chart-card">
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={bins} margin={{ top: 12, right: 20, bottom: 4, left: 0 }}>
+            <CartesianGrid stroke="var(--line)" vertical={false} />
+            <XAxis
+              dataKey="lo"
+              tickFormatter={(v: number) => String(v)}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={axisTick}
+              axisLine={{ stroke: 'var(--line)' }}
+              tickLine={{ stroke: 'var(--line)' }}
+              width={36}
+            />
+            <Tooltip content={<HistTip />} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
+            <ReferenceLine
+              x={Math.floor(career.median / 10) * 10}
+              stroke="var(--gold)"
+              strokeDasharray="4 4"
+              label={{ value: `median ${career.median.toFixed(1)}`, fill: 'var(--gold-2)', fontSize: 11, position: 'insideTopRight' }}
+            />
+            <Bar dataKey="count" fill="var(--s1)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="chart-caption">Each bar counts weeks scoring within a 10-point band.</div>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <SectionHead title="By Season" note="Box = middle 50% · line = median · whiskers = best and worst week · all seasons share one scale" />
+        <Card className="card-pad">
+          {bySeason.map((s) => (
+            <div key={s.year} className="dist-row">
+              <Link to={`/seasons/${s.year}`} className="dist-year">{s.year}</Link>
+              <BoxPlotRow dist={s.dist} domain={domain} />
+              <span className="dist-med tnum">{fmt(s.dist.median, 1)}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function HistTip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { lo: number; hi: number; count: number } }> }) {
+  if (!active || !payload?.length) return null;
+  const b = payload[0].payload;
+  return (
+    <div className="tooltip-card">
+      <div className="tt-title">{b.lo}–{b.hi} points</div>
+      <div className="tooltip-row">
+        <span className="muted">Weeks</span>
+        <span className="tnum">{b.count}</span>
+      </div>
     </div>
   );
 }

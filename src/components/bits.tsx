@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { clsx } from '../lib/util';
 
 export function PageHead({ eyebrow, title, lede }: { eyebrow?: string; title: string; lede?: ReactNode }) {
@@ -45,8 +45,8 @@ export function StatTile({
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={clsx('card', className)}>{children}</div>;
+export function Card({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+  return <div className={clsx('card', className)} style={style}>{children}</div>;
 }
 
 export function Badge({ kind, children }: { kind?: 'champ' | 'runner' | 'playoff' | 'sacko'; children: ReactNode }) {
