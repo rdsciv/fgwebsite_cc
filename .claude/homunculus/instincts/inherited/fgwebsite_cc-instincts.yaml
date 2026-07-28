@@ -1,0 +1,372 @@
+# Instincts generated from https://github.com/rdsciv/fgwebsite_cc
+# Generated: 2026-07-27T18:37:28.204Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: fgwebsite_cc-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Commit Length
+
+## Action
+
+Keep commit messages concise (~44 characters)
+
+## Evidence
+
+- Average commit message length: 44 chars
+- Based on 4 commits
+
+---
+id: fgwebsite_cc-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: fgwebsite_cc-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: fgwebsite_cc-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: fgwebsite_cc-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: components, lib, pages
+
+---
+id: fgwebsite_cc-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: fgwebsite_cc-workflow-add-or-update-seasonal-data
+trigger: "when doing add or update seasonal data"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Workflow Add Or Update Seasonal Data
+
+## Action
+
+Follow the add-or-update-seasonal-data workflow:
+1. Add or update JSON data files for the new season in public/data or data/ directories.
+2. Update or create scripts in scripts/ to process or build the new data.
+3. Modify or extend src/components/ and src/pages/ to use or display the new data.
+4. Update src/lib/ modules to handle new data structure or calculations if needed.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: public/data/boxscores/YYYY.json, public/data/roster-age/YYYY.json, data/player-bio.json
+
+---
+id: fgwebsite_cc-workflow-feature-development-with-data-and-ui
+trigger: "when doing feature development with data and ui"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Workflow Feature Development With Data And Ui
+
+## Action
+
+Follow the feature-development-with-data-and-ui workflow:
+1. Update or add data files as needed for the feature.
+2. Modify or add scripts in scripts/ to process or generate new data.
+3. Update or create src/components/ and src/pages/ for UI changes.
+4. Update or create src/lib/ utility modules to support new logic.
+5. Update types in src/types.ts if new data structures are introduced.
+6. Update styling or config files if necessary.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: data/*.json, public/data/**/*.json, scripts/*.mjs
+
+---
+id: fgwebsite_cc-instinct-file-naming
+trigger: "When creating a new file in src/components or src/pages"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct File Naming
+
+## Action
+
+Name the file using PascalCase (e.g., PlayerStats.tsx)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+- Observed in src/components and src/pages
+
+---
+id: fgwebsite_cc-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Function Naming
+
+## Action
+
+Name the function using camelCase (e.g., fetchPlayerData)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: fgwebsite_cc-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase (e.g., PlayerCard)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: fgwebsite_cc-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE (e.g., MAX_PLAYERS)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: fgwebsite_cc-instinct-import-style
+trigger: "When importing modules within the project"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Import Style
+
+## Action
+
+Use relative import paths (e.g., import x from '../lib/x')
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: fgwebsite_cc-instinct-export-style
+trigger: "When exporting functions, classes, or constants"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Export Style
+
+## Action
+
+Use named exports (e.g., export function foo())
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: fgwebsite_cc-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Test Location
+
+## Action
+
+Place test files in a separate test directory, not mixed with src/
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: fgwebsite_cc-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Git Commit Format
+
+## Action
+
+Write freeform commit messages without a strict prefix, typically around 44 characters
+
+## Evidence
+
+- Pattern in commits.type
+- Examples in commits.examples
+
+---
+id: fgwebsite_cc-instinct-add-seasonal-data
+trigger: "When adding or updating data for a new season (e.g., new year of stats, rosters, or boxscores)"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Add Seasonal Data
+
+## Action
+
+Add or update JSON data files in public/data or data/, update or create scripts in scripts/, modify or extend src/components/ and src/pages/, and update src/lib/ modules as needed
+
+## Evidence
+
+- Workflow: add-or-update-seasonal-data
+- Example commit sequence and files
+
+---
+id: fgwebsite_cc-instinct-feature-development
+trigger: "When developing a new feature or enhancement that requires changes across data, scripts, UI, and utility code"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: rdsciv/fgwebsite_cc
+---
+
+# Fgwebsite_cc Instinct Feature Development
+
+## Action
+
+Update or add data files, modify or add scripts, update or create src/components/ and src/pages/, update or create src/lib/ modules, update types in src/types.ts if needed, and update styling/config files as necessary
+
+## Evidence
+
+- Workflow: feature-development-with-data-and-ui
+- Example commit sequence and files
+
