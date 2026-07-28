@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useLeague } from '../data';
 import { SectionHead, StatTile, Card } from '../components/bits';
-import logo from '../assets/affl-logo.png';
 import { OwnerChip } from '../components/OwnerChip';
 import { fmt0, ordinal, pct, recordStr } from '../lib/util';
 import { championElevation } from '../lib/championStory';
@@ -11,8 +10,9 @@ import { computeTeamPotential } from '../lib/idealLineup';
 import type { Owner } from '../types';
 
 export function Overview() {
-  const { league, ownerName, teamLabel, seasonByYear } = useLeague();
-  const { meta, owners, championsTimeline, records } = league;
+  const { league, ownerName, teamLabel, seasonByYear, visibleOwners } = useLeague();
+  const { meta, championsTimeline, records } = league;
+  const owners = visibleOwners;
 
   const totalGames = league.seasons.reduce((a, s) => a + s.matchups.length, 0);
   const totalPoints = league.seasons.reduce((a, s) => a + s.teams.reduce((b, t) => b + t.pf, 0), 0);
@@ -75,22 +75,8 @@ export function Overview() {
 
   return (
     <div className="page">
-      <header className="page-head brand-head">
-        <img className="brand-logo" src={logo} alt="" />
-        <div>
-          <div className="page-eyebrow">League History</div>
-          <h1 className="page-title">AFFL</h1>
-        </div>
-      </header>
-
-      <div className="grid cols-3 overview-stats">
-        <StatTile label="Seasons" value={meta.nSeasons} accent="gold" sub={`${meta.firstSeason}–${meta.lastSeason}`} />
-        <StatTile label="Games Played" value={fmt0(totalGames)} accent="green" sub="regular season + playoffs" />
-        <StatTile label="Points Scored" value={fmt0(totalPoints)} sub={`across ${meta.nSeasons} seasons`} />
-      </div>
-
-      {/* reigning champion spotlight — team name first */}
-      <div className="section">
+      {/* the first screen leads with the standing answer to "who's on top", not the league name */}
+      <div className="section section-lead">
         <div className="reign-card card">
           <div className="reign-glow" />
           <div className="reign-body">
@@ -108,12 +94,30 @@ export function Overview() {
               <Link
                 to={`/owners/${encodeURIComponent(reign.champion.ownerId)}`}
                 className="link-arrow"
-                style={{ marginTop: 14, display: 'inline-block' }}
+                style={{ marginTop: 12, display: 'inline-block' }}
               >
                 Franchise page →
               </Link>
             )}
           </div>
+          {/* league totals ride in the band's right half — it was empty space otherwise */}
+          <dl className="reign-facts">
+            <div>
+              <dt>Seasons</dt>
+              <dd>{meta.nSeasons}</dd>
+              <span>{meta.firstSeason}–{meta.lastSeason}</span>
+            </div>
+            <div>
+              <dt>Games Played</dt>
+              <dd>{fmt0(totalGames)}</dd>
+              <span>regular season + playoffs</span>
+            </div>
+            <div>
+              <dt>Points Scored</dt>
+              <dd>{fmt0(totalPoints)}</dd>
+              <span>across {meta.nSeasons} seasons</span>
+            </div>
+          </dl>
         </div>
       </div>
 

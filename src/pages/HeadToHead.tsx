@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLeague } from '../data';
 import { PageHead, SectionHead, Card } from '../components/bits';
@@ -18,8 +18,9 @@ function cellBg(c: H2HCell): string {
 }
 
 export function HeadToHead() {
-  const { league, ownerName } = useLeague();
-  const { owners, headToHead } = league;
+  const { league, ownerName, visibleOwners } = useLeague();
+  const { headToHead } = league;
+  const owners = visibleOwners;
 
   // ---- Part 1: matrix scope toggle --------------------------------------
   const [scope, setScope] = useState<'core' | 'all'>('core');
@@ -86,6 +87,13 @@ export function HeadToHead() {
 
   const [aId, setAId] = useState(defaultA);
   const [bId, setBId] = useState(defaultB);
+
+  // Archiving former franchises can pull the current selection out of the picker; fall back to the
+  // defaults rather than leaving a rivalry pinned to a team no longer in the list.
+  useEffect(() => {
+    if (!owners.some((o) => o.id === aId)) setAId(defaultA);
+    if (!owners.some((o) => o.id === bId)) setBId(defaultB);
+  }, [owners, aId, bId, defaultA, defaultB]);
 
   const aName = ownerName(aId);
   const bName = ownerName(bId);

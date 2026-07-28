@@ -3,14 +3,14 @@ import { PageHead, SectionHead, StatTile } from '../components/bits';
 import { OwnerChip } from '../components/OwnerChip';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { fmt, fmt0, ordinal, pct, recordStr } from '../lib/util';
+import { tenure } from '../lib/former';
 import type { Owner } from '../types';
 
 const FAR = Number.POSITIVE_INFINITY;
 
 export function AllTimeStandings() {
-  const { league } = useLeague();
-  const owners = league.owners;
-  const currentSeason = league.meta.lastSeason;
+  const { league, visibleOwners, isFormer } = useLeague();
+  const owners = visibleOwners;
 
   // Career leaders for the KPI row.
   const winningest = [...owners].sort((a, b) => b.allTime.wins - a.allTime.wins)[0];
@@ -33,16 +33,14 @@ export function AllTimeStandings() {
       defaultDesc: false,
       value: (o) => o.name,
       render: (o) => {
-        const first = o.seasonsPlayed[0];
-        const last = o.seasonsPlayed[o.seasonsPlayed.length - 1];
-        const active = last === currentSeason;
+        const former = isFormer(o.id);
         const franchise = o.teamNames[o.teamNames.length - 1];
         return (
           <OwnerChip
             id={o.id}
             name={o.name}
-            tag={active ? undefined : <span className="badge former">Former</span>}
-            team={active ? franchise : `${franchise} · ${first}–${last}`}
+            tag={former ? <span className="badge former">Former</span> : undefined}
+            team={former ? `${franchise} · ${tenure(o)}` : franchise}
           />
         );
       },

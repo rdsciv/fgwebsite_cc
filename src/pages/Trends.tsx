@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -104,8 +104,9 @@ function TrajTip({ active, payload, label }: TipProps) {
 }
 
 export function Trends() {
-  const { league, ownerName } = useLeague();
-  const { seasons, owners } = league;
+  const { league, ownerName, visibleOwners } = useLeague();
+  const { seasons } = league;
+  const owners = visibleOwners;
 
   const axisTick = { fill: 'var(--ink-3)', fontSize: 12 };
 
@@ -120,7 +121,7 @@ export function Trends() {
   );
   const scoreDomain = useMemo<[number, number]>(() => {
     const vals = scoringData.map((d) => d.ppg);
-    return [Math.floor(Math.min(...vals) - 4), Math.ceil(Math.max(...vals) + 4)];
+    return [Math.floor((Math.min(...vals) - 4) / 5) * 5, Math.ceil((Math.max(...vals) + 4) / 5) * 5];
   }, [scoringData]);
 
   // 2 — championship pedigree: managers with titles, desc
@@ -172,6 +173,16 @@ export function Trends() {
   const [selected, setSelected] = useState<string[]>(() =>
     rankedOwners.slice(0, 3).map((o) => o.id),
   );
+
+  // Drop any plotted franchise that the archive toggle just hid, so the chart never shows a series
+  // whose button is no longer on screen. Returning `prev` unchanged keeps this from re-rendering.
+  useEffect(() => {
+    setSelected((prev) => {
+      const kept = prev.filter((id) => owners.some((o) => o.id === id));
+      if (kept.length === prev.length) return prev;
+      return kept.length ? kept : rankedOwners.slice(0, 3).map((o) => o.id);
+    });
+  }, [owners, rankedOwners]);
 
   const colorOf = (id: string) => {
     const i = selected.indexOf(id);
@@ -250,6 +261,7 @@ export function Trends() {
                 />
                 <YAxis
                   domain={scoreDomain}
+                  tickFormatter={(v: number) => v.toFixed(0)}
                   tick={axisTick}
                   axisLine={{ stroke: 'var(--line)' }}
                   tickLine={{ stroke: 'var(--line)' }}
@@ -263,6 +275,7 @@ export function Trends() {
                   strokeWidth={2.5}
                   dot={{ r: 3, fill: 'var(--s1)', strokeWidth: 0 }}
                   activeDot={{ r: 5 }}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -272,14 +285,15 @@ export function Trends() {
             <div className="chart-title">Championship pedigree</div>
             <div className="chart-sub">Titles won, managers with at least one</div>
             <ResponsiveContainer width="100%" height={264}>
-              <BarChart data={titleData} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
+              <BarChart data={titleData} margin={{ top: 20, right: 12, left: 62, bottom: 0 }}>
                 <CartesianGrid stroke="var(--line)" vertical={false} />
                 <XAxis
                   dataKey="name"
                   interval={0}
                   angle={-30}
                   textAnchor="end"
-                  height={78}
+                  height={92}
+                  tickMargin={6}
                   tick={axisTick}
                   axisLine={{ stroke: 'var(--line)' }}
                   tickLine={{ stroke: 'var(--line)' }}
@@ -293,7 +307,7 @@ export function Trends() {
                   width={28}
                 />
                 <Tooltip content={<TitleTip />} cursor={{ fill: 'var(--surface-2)' }} />
-                <Bar dataKey="titles" fill="var(--gold)" radius={[5, 5, 0, 0]} maxBarSize={54}>
+                <Bar dataKey="titles" fill="var(--gold)" radius={[5, 5, 0, 0]} maxBarSize={54} isAnimationActive={false}>
                   <LabelList
                     dataKey="titles"
                     position="top"
@@ -371,6 +385,7 @@ export function Trends() {
                   dot={{ r: 3, fill: colorOf(id), strokeWidth: 0 }}
                   activeDot={{ r: 5 }}
                   connectNulls={false}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>
@@ -421,7 +436,7 @@ export function Trends() {
                 tickLine={{ stroke: 'var(--line)' }}
               />
               <Tooltip content={<CareerTip />} cursor={{ fill: 'var(--surface-2)' }} />
-              <Bar dataKey="ppg" fill="var(--s3)" radius={[0, 5, 5, 0]} maxBarSize={22} />
+              <Bar dataKey="ppg" fill="var(--s3)" radius={[0, 5, 5, 0]} maxBarSize={22} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -437,13 +452,13 @@ export function Trends() {
           {distData.map(({ id, name, dist }, i) => (
             <div className="record-row" key={id}>
               <span className="record-rank">{i + 1}</span>
-              <div className="record-main" style={{ flex: '0 0 210px' }}>
+              <div className="record-main dist-name">
                 <OwnerChip id={id} name={name} size={22} />
                 <div className="record-sub" style={{ marginTop: 4 }}>
                   {fmt0(dist.median)} median · {fmt0(dist.min)}–{fmt0(dist.max)}
                 </div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div className="dist-track">
                 <BoxPlotRow dist={dist} domain={distDomain} />
               </div>
             </div>

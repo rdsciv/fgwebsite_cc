@@ -2,6 +2,7 @@
 // across each team's starters. AFFL itself is a head-to-head points league — this re-scores the
 // same underlying stats as if it were a 9-category roto league, purely as a supplemental view.
 import type { Season, SeasonBox } from '../types';
+import { tierInPhase, type Phase } from './phase';
 
 export type CatKey = 'py' | 'ptd' | 'compPct' | 'ry' | 'rtd' | 'ypc' | 'recy' | 'retd' | 'rec' | 'ypr';
 export type CatGroup = 'Passing' | 'Rushing' | 'Receiving';
@@ -23,6 +24,7 @@ export interface TeamCategoryStats {
   categories: CategoryValue[];
   totalPts: number;
   totalRank: number;
+  games: number; // eligible games summed — unequal counts make a roto comparison apples-to-oranges
 }
 
 const CATS: { key: CatKey; label: string; group: CatGroup }[] = [
@@ -42,10 +44,19 @@ interface RawTotals {
   py: number; ptd: number; cmp: number; att: number;
   ry: number; rtd: number; car: number;
   rec: number; recy: number; retd: number;
+  games: number;
 }
-const emptyTotals = (): RawTotals => ({ py: 0, ptd: 0, cmp: 0, att: 0, ry: 0, rtd: 0, car: 0, rec: 0, recy: 0, retd: 0 });
+const emptyTotals = (): RawTotals => ({ py: 0, ptd: 0, cmp: 0, att: 0, ry: 0, rtd: 0, car: 0, rec: 0, recy: 0, retd: 0, games: 0 });
 
-export function computeCategoryStats(box: SeasonBox, season: Season): TeamCategoryStats[] {
+// `phase` defaults to 'reg' because it is the only phase where every team plays the same number of
+// games. Postseason schedules are uneven by construction (byes, 2- vs 3-game ladders), so ranking
+// raw counting stats over anything that includes them rewards volume, not production.
+export function computeCategoryStats(
+  box: SeasonBox,
+  season: Season,
+  phase: Phase = 'reg',
+  includeConsolation = false,
+): TeamCategoryStats[] {
   const totals = new Map<number, RawTotals>();
   const T = (tid: number) => {
     let t = totals.get(tid);
@@ -54,8 +65,10 @@ export function computeCategoryStats(box: SeasonBox, season: Season): TeamCatego
   };
   for (const games of Object.values(box.weeks)) {
     for (const g of games) {
+      if (!tierInPhase(g.tier, phase, includeConsolation)) continue;
       for (const side of [g.home, g.away]) {
         const t = T(side.teamId);
+        t.games += 1;
         for (const p of side.starters) {
           if (!p.st) continue;
           t.py += p.st.py; t.ptd += p.st.ptd; t.cmp += p.st.cmp; t.att += p.st.att;
@@ -71,6 +84,7 @@ export function computeCategoryStats(box: SeasonBox, season: Season): TeamCatego
 
   const derived = [...totals.entries()].map(([teamId, raw]) => ({
     teamId,
+    games: raw.games,
     values: {
       py: raw.py,
       ptd: raw.ptd,
@@ -108,7 +122,7 @@ export function computeCategoryStats(box: SeasonBox, season: Season): TeamCatego
       return { key: cat.key, label: cat.label, group: cat.group, value: d.values[cat.key], ...rn };
     });
     const totalPts = categories.reduce((a, c) => a + c.pts, 0);
-    return { teamId: d.teamId, ownerId: t?.ownerId ?? '', teamName: t?.teamName ?? `Team ${d.teamId}`, categories, totalPts, totalRank: 0 };
+    return { teamId: d.teamId, ownerId: t?.ownerId ?? '', teamName: t?.teamName ?? `Team ${d.teamId}`, categories, totalPts, totalRank: 0, games: d.games };
   });
 
   out.sort((a, b) => b.totalPts - a.totalPts);

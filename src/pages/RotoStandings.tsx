@@ -6,8 +6,12 @@ import { SkillRadarPanel } from '../components/CategoryRadar';
 import { CategoryBreakdownTable, GROUP_COLOR } from '../components/CategoryBreakdown';
 import { loadBoxscore, hasBoxscores } from '../lib/boxscores';
 import { computeCategoryStats, leagueAverageNorm, type CatKey, type CategoryValue } from '../lib/categoryStats';
-import { clsx } from '../lib/util';
+import { buildRotoCareer, type RotoCareerResult } from '../lib/rotoCareer';
+import { PHASE_LABEL, type Phase } from '../lib/phase';
+import { clsx, ordinal } from '../lib/util';
 import type { SeasonBox } from '../types';
+
+const PHASES: Phase[] = ['reg', 'post', 'combined'];
 
 // Rank-based cell shading (1 = best), mirroring HeadToHead.tsx's win%-based cellBg().
 function rankCellBg(rank: number, nTeams: number): string {
@@ -25,11 +29,13 @@ function formatCatValue(c: { key: CatKey; value: number }) {
 }
 
 export function RotoStandings() {
-  const { league, ownerName } = useLeague();
+  const { league, ownerName, isFormer, showFormer } = useLeague();
   const boxYears = league.meta.seasons.filter(hasBoxscores);
   const [year, setYear] = useState(league.meta.lastSeason);
+  const [phase, setPhase] = useState<Phase>('reg');
   const [box, setBox] = useState<SeasonBox | null>(null);
   const [teamId, setTeamId] = useState<number | null>(null);
+  const [career, setCareer] = useState<RotoCareerResult | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -41,8 +47,33 @@ export function RotoStandings() {
     };
   }, [year]);
 
+  // Career roto: every boxscore season re-scored, then averaged per manager. A year that fails to
+  // load is carried through as a coverage gap rather than being folded in as an empty season.
+  useEffect(() => {
+    let alive = true;
+    Promise.all(
+      boxYears.map(async (y) => ({
+        year: y,
+        season: league.seasons.find((x) => x.year === y),
+        box: await loadBoxscore(y),
+      })),
+    ).then((loads) => {
+      if (alive) setCareer(buildRotoCareer(loads, phase));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [league, boxYears.join(), phase]);
+
+  // The career table lists franchises as a set, so it honors the site-wide archive toggle. The
+  // season detail below is year-scoped and always shows whoever actually played that year.
+  const careerRows = useMemo(
+    () => (!career ? [] : showFormer ? career.rows : career.rows.filter((c) => !isFormer(c.ownerId))),
+    [career, showFormer, isFormer],
+  );
+
   const season = league.seasons.find((s) => s.year === year);
-  const teams = useMemo(() => (box && season ? computeCategoryStats(box, season) : []), [box, season]);
+  const teams = useMemo(() => (box && season ? computeCategoryStats(box, season, phase) : []), [box, season, phase]);
   const leagueAvg = useMemo(() => leagueAverageNorm(teams), [teams]);
   const selected = teams.find((t) => t.teamId === teamId) ?? teams[0] ?? null;
   const nTeams = teams.length;
@@ -63,6 +94,92 @@ export function RotoStandings() {
         }
       />
 
+      {/* Phase governs both tables below. Regular is the default because it is the only phase where
+          every team plays the same number of games — see the note under the toggle. */}
+      <div className="year-strip" style={{ marginBottom: 8 }}>
+        {PHASES.map((p) => (
+          <button key={p} className={clsx('year-btn', p === phase && 'active')} onClick={() => setPhase(p)}>
+            {PHASE_LABEL[p]}
+          </button>
+        ))}
+      </div>
+      <p className="muted" style={{ marginTop: 0, marginBottom: 20, fontSize: 13 }}>
+        {phase === 'reg'
+          ? 'Regular season only — every team plays the same number of games, so category totals are directly comparable.'
+          : phase === 'post'
+            ? 'Winners-bracket games only. Teams play unequal numbers of playoff games (byes, 2- vs 3-game paths), so totals are not directly comparable — the games column shows each team’s sample.'
+            : 'Regular season + winners bracket. Consolation games are excluded. Playoff teams play more games than eliminated ones, so counting totals favor deeper runs.'}
+      </p>
+
+      {/* career view: who is consistently good in category terms, not just this year */}
+      {career && careerRows.length > 0 && (
+        <div className="section section-lead">
+          <SectionHead
+            title="Average Roto Finish"
+            note={`Mean roto placement across ${career.scoredYears.length} scored season${career.scoredYears.length === 1 ? '' : 's'} (${career.scoredYears[0]}–${career.scoredYears[career.scoredYears.length - 1]}) · lower is better`}
+          />
+          {career.evidence === 'Partial' && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--loss)' }}>
+              <span className="badge sacko">Partial</span>{' '}
+              {career.missingYears.join(', ')} could not be loaded and {career.missingYears.length === 1 ? 'is' : 'are'} excluded
+              from every average and ranking below. These are data gaps, not seasons anyone sat out.
+            </p>
+          )}
+          <div className="chart-table">
+            <table>
+              <thead>
+                <tr>
+                  <th className="left">Manager</th>
+                  <th>Seasons</th>
+                  <th>Avg finish</th>
+                  <th>Best</th>
+                  <th>Worst</th>
+                  <th>Avg pts</th>
+                  {career.scoredYears.map((y) => <th key={y}>{String(y).slice(2)}</th>)}
+                  {career.missingYears.map((y) => (
+                    <th key={y} className="muted" title={`${y} data unavailable`}>{String(y).slice(2)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {careerRows.map((c) => (
+                  <tr key={c.ownerId}>
+                    <td className="left">{ownerName(c.ownerId)}</td>
+                    <td className="tnum">{c.seasons}</td>
+                    <td className="tnum" style={{ color: 'var(--gold-2)', fontWeight: 700 }}>{c.avgRank.toFixed(2)}</td>
+                    <td className="tnum">{ordinal(c.bestRank)}</td>
+                    <td className="tnum">{ordinal(c.worstRank)}</td>
+                    <td className="tnum">{c.avgPts.toFixed(1)}</td>
+                    {career.scoredYears.map((y) => {
+                      const cell = c.byYear.get(y);
+                      return (
+                        <td key={y} className="tnum" style={cell ? { background: rankCellBg(cell.rank, cell.nTeams) } : undefined}>
+                          {cell ? cell.rank : <span className="muted" title="Did not play this season">—</span>}
+                        </td>
+                      );
+                    })}
+                    {career.missingYears.map((y) => (
+                      <td key={y} className="tnum muted" title={`${y} data unavailable — not counted in this average`}>?</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {career && career.evidence === 'Unavailable' && (
+        <div className="section section-lead">
+          <SectionHead title="Average Roto Finish" note="Career rollup" />
+          <div className="empty">Career roto is unavailable — no season boxscores could be loaded.</div>
+        </div>
+      )}
+
+      <div className="section">
+        <SectionHead title="Season Detail" note="Full category table for a single year" />
+      </div>
+
       <div className="year-strip" style={{ marginBottom: 16 }}>
         {boxYears.map((y) => (
           <button
@@ -78,8 +195,10 @@ export function RotoStandings() {
         ))}
       </div>
 
-      {!box || !teams.length ? (
+      {!box ? (
         <div className="empty">Loading {year} category stats…</div>
+      ) : !teams.length ? (
+        <div className="empty">No {PHASE_LABEL[phase].toLowerCase()} games scored for {year}.</div>
       ) : (
         <>
           <div className="section">
@@ -92,6 +211,7 @@ export function RotoStandings() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'left' }}>Team</th>
+                    <th title="Eligible games in this phase — totals are only comparable when these match">G</th>
                     {cols.map((c) => (
                       <th key={c.key} title={`${c.group} · ${c.label}`} style={{ color: GROUP_COLOR[c.group] }}>
                         {c.label}
@@ -110,6 +230,7 @@ export function RotoStandings() {
                       <td style={{ textAlign: 'left' }}>
                         <OwnerChip id={t.ownerId} name={ownerName(t.ownerId)} size={20} link={false} />
                       </td>
+                      <td className="tnum muted">{t.games}</td>
                       {t.categories.map((c) => (
                         <td key={c.key} style={{ background: rankCellBg(c.rank, nTeams) }} title={`${c.label}: ${formatCatValue(c)} · rank #${c.rank}/${nTeams}`}>
                           {formatCatValue(c)}
@@ -146,7 +267,7 @@ export function RotoStandings() {
                 <SkillRadarPanel team={selected} leagueAvg={leagueAvg} nTeams={nTeams} />
               </div>
               <div className="section">
-                <SectionHead title={`Category Breakdown · ${selected.teamName}`} note={`${year} season`} />
+                <SectionHead title={`Category Breakdown · ${selected.teamName}`} note={`${year} · ${PHASE_LABEL[phase]}`} />
                 <Card className="card-pad">
                   <CategoryBreakdownTable team={selected} nTeams={nTeams} />
                 </Card>

@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { isFormerOwner } from './lib/former';
 import type { League, Owner, Season } from './types';
+
+const SHOW_FORMER_KEY = 'affl:show-former';
 
 interface Ctx {
   league: League;
@@ -11,6 +14,18 @@ interface Ctx {
   managerName: (id: string) => string;
   /** Most recent (or year-specific) team name for an owner. */
   teamLabel: (id: string, year?: number) => string;
+  /** Has this franchise stopped appearing in the latest season? */
+  isFormer: (id: string) => boolean;
+  /** Site-wide archive toggle: are former franchises currently shown? */
+  showFormer: boolean;
+  setShowFormer: (v: boolean) => void;
+  formerCount: number;
+  /**
+   * Owners for views that list franchises as a SET (all-time tables, the h2h matrix, leaderboards,
+   * pickers). Season-scoped views must keep using `league.owners` — a 2018 page has to show 2018's
+   * teams whether or not they still exist.
+   */
+  visibleOwners: Owner[];
 }
 
 const LeagueContext = createContext<Ctx | null>(null);
@@ -30,6 +45,22 @@ function latestTeamName(o: Owner | undefined, year?: number): string | null {
 export function LeagueProvider({ children }: { children: ReactNode }) {
   const [league, setLeague] = useState<League | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Archived by default; the choice sticks across visits. Storage can throw in private mode.
+  const [showFormer, setShowFormerState] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_FORMER_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setShowFormer = (v: boolean) => {
+    setShowFormerState(v);
+    try {
+      localStorage.setItem(SHOW_FORMER_KEY, v ? '1' : '0');
+    } catch {
+      /* preference is best-effort */
+    }
+  };
 
   useEffect(() => {
     fetch('./data/league.json')
@@ -53,8 +84,19 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     };
     // Site-wide default display is franchise/team name; owner ids still track managers.
     const ownerName = (id: string) => teamLabel(id);
-    return { league, ownerById, seasonByYear, ownerName, managerName, teamLabel };
-  }, [league]);
+
+    const lastSeason = league.meta.lastSeason;
+    const formerIds = new Set(
+      league.owners.filter((o) => isFormerOwner(o, lastSeason)).map((o) => o.id),
+    );
+    const isFormer = (id: string) => formerIds.has(id);
+    const visibleOwners = showFormer ? league.owners : league.owners.filter((o) => !formerIds.has(o.id));
+
+    return {
+      league, ownerById, seasonByYear, ownerName, managerName, teamLabel,
+      isFormer, showFormer, setShowFormer, formerCount: formerIds.size, visibleOwners,
+    };
+  }, [league, showFormer]);
 
   if (error) {
     return (
